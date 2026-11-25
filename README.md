@@ -8,17 +8,29 @@ Or open this folder in Godot 4.7 (Import > pick `project.godot`) and press F5.
 Portrait (720x1280). Mouse clicks act as touches, so the phone controls work on desktop too.
 
 ## The loop
-1. **Day:** spend coins in the Farm Store (repairs, vaccine darts, pitchfork, fences, more animals),
+1. **Day:** spend coins in the Farm Store (repairs, vaccine darts, pitchfork, fences, planks, more animals),
    **train soldiers** from your herd, **raid rival farms**, or play **Fence Fixer** puzzles.
-2. **Night (8-second turn timer):** hordes chew through fence sections. A bitten animal turns into a
-   zombie animal after 8 seconds unless you deal with it:
-   - **Save:** carry it into the barn glow (4 barn slots, safe until dawn)
-   - **Cure:** vaccine dart
-   - **Send upstate:** cull it (hold the button)
-   - **Chain:** keep it as a Dead Stock undead soldier (2 chain posts a night)
-   At most 35% of the herd can turn in one night.
-3. **Dawn:** surviving animals pay out, the army eats (feed costs coins), and the **Dawn Gazette**
-   may warn you that a rival gang raids tomorrow night.
+2. **Dusk (planning):** the forecast shows every wave tonight: when, which side, and what types.
+   You get planks (3 + fence level + any you bought) to place on fence sections:
+   - **Barricade** (1 plank): that section is twice as strong tonight
+   - **Spikes** (2): hurt anything chewing that section (brutes take half)
+   - **Scarecrow** (2): crows go for it first, and hordes arriving nearby head for its section, so you can funnel them into your spikes
+   Tap a section to place, tap again to remove. Then HOLD THE LINE.
+3. **Night:** each zombie type needs a different answer:
+   - **Walkers** chew a fence section, then go for the herd
+   - **Brutes** (from night 2) chew 3x faster and take 3x the hits
+   - **Crows** (from night 3) fly over fences straight at your animals
+   - **Bloaters** (from night 4) burst when they die or touch an animal and bite everything in the purple ring.
+     Kill them **outside** the fence.
+   From night 4, the last wave hits two sides at once. Your pitchfork costs **stamina** per swing, so you
+   can't hold every side: pick your fights. A bitten animal turns after 8 seconds unless you
+   **Save** it (carry into the barn glow, 4 slots), **Cure** it (vaccine dart), **Send it upstate** (hold), or
+   **Chain** it (it becomes a Dead Stock soldier, 2 posts a night). At most 35% of the herd can turn in one night.
+4. **Dawn:** surviving animals pay out, the army eats (feed costs coins), and the **Dawn Gazette** may warn you
+   that a rival gang raids tomorrow night.
+
+Balance check (sweep bot, 8 nights x 3 runs): a bot that plans at dusk and triages bites keeps 96% of its herd;
+a bot that skips planning and just chases zombies keeps 48% and usually loses the farm.
 
 ## Simulated PvP (release-1 plan)
 No servers and no other players yet. PvP is simulated:
@@ -50,7 +62,8 @@ Space start night / next day.
 ## Dev tools
 - `godot --path . -- --autotest=<folder>`: bot plays 3 nights, a rival raid, Fence Fixer and a rival raid
   night, and saves screenshots.
-- `godot --headless --path . --fixed-fps 30 -- --sweep=6,8,12 --nights=5 --runs=4`: turn-timer experiment.
+- `godot --headless --path . --fixed-fps 30 -- --sweep=8 --nights=8 --runs=3 [--lazy]`: balance bot
+  (`--lazy` = skip dusk planning and just chase zombies).
 - Fence Fixer alone: run `ff.tscn` (`--verify` proves the levels solvable headless).
 
 The prototype prints `[telemetry]` lines to the console only. It sends nothing over the network.
