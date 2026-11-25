@@ -1,0 +1,2643 @@
+{
+ "pack": "Fence Fixer pack 1",
+ "version": 1,
+ "task": "T-4",
+ "units": "px; 1 tile = 30 px; pen radius 210; sim step 1/15 s",
+ "slots": "fH fence at clock hour H (0=12 o'clock), nH near lane r=255, oH far lane r=330, pH post r=160, c centre",
+ "levels": [
+  {
+   "name": "Mind the Gap",
+   "idea": "Fences buy time; sunrise wins",
+   "new": "Wood fence, sunrise timer",
+   "intro": "Grandpa's napping in the middle. Patch the hole and wait for the rooster.",
+   "outro": "Fences don't have to win. They just have to last.",
+   "night_length": 26,
+   "budget": 1,
+   "min_keep": 3,
+   "three_star": {
+    "rule": "budget",
+    "value": 1,
+    "text": "use 1 plank or less"
+   },
+   "fences": "WWW.WWWWWWWW",
+   "farmer_locked": true,
+   "pieces": {
+    "wood": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 3,
+     "r": 95
+    },
+    {
+     "kind": "chicken",
+     "hour": 2,
+     "r": 90
+    },
+    {
+     "kind": "pig",
+     "hour": 4,
+     "r": 95
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 3,
+     "gap": 4.0
+    }
+   ],
+   "solution": {
+    "pieces": [
+     {
+      "piece": "wood",
+      "slot": "f3"
+     }
+    ],
+    "farmer": "c"
+   },
+   "shot_t": 20,
+   "id": 1,
+   "farmer": "c"
+  },
+  {
+   "name": "Grandpa's Post",
+   "idea": "The farmer guards one segment; put him where the horde is",
+   "new": "Farmer post (free, 1 per level)",
+   "intro": "Six of them, one side. Grandpa's awake now. Tap a post to station him.",
+   "outro": "A pitchfork in the right place beats ten planks in the wrong one.",
+   "night_length": 40,
+   "budget": 0,
+   "min_keep": 4,
+   "three_star": {
+    "rule": "fences_standing",
+    "value": 0,
+    "text": "no fence breaks"
+   },
+   "pieces": {
+    "farmer": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 6,
+     "gap": 2.5
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": []
+   },
+   "shot_t": 16,
+   "id": 2,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "One Plank Short",
+   "idea": "Read the forecast: farmer to the heavy lane, plank to the light one",
+   "new": "Budget trade-off (two gaps, one plank)",
+   "intro": "Two holes, one plank. The arrows say how many are coming.",
+   "outro": "Count the arrows before you count the planks.",
+   "night_length": 32,
+   "budget": 1,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 1,
+    "text": "use 1 plank or less"
+   },
+   "fences": "WWW.WWWWW.WW",
+   "pieces": {
+    "farmer": 1,
+    "wood": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 4,
+     "gap": 2.0
+    },
+    {
+     "t": 1,
+     "type": "shambler",
+     "hour": 3,
+     "count": 2,
+     "gap": 5.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "wood",
+      "slot": "f3"
+     }
+    ]
+   },
+   "shot_t": 14,
+   "id": 3,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Ouch Fence",
+   "idea": "Barbed fences hurt whoever chews them",
+   "new": "Barbed fence (thorns)",
+   "intro": "Grandpa threw his back out. The fence will have to fight back.",
+   "outro": "They bit off more than they could chew. Literally.",
+   "night_length": 45,
+   "budget": 2,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 2,
+    "text": "tuck in every zombie before sunrise"
+   },
+   "farmer_locked": true,
+   "pieces": {
+    "barbed": 1,
+    "wood": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 4,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     }
+    ],
+    "farmer": "c"
+   },
+   "shot_t": 18,
+   "id": 4,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c"
+  },
+  {
+   "name": "Split Shift",
+   "idea": "Combine: farmer on the heavy lane, barbed fence on the light one",
+   "new": "Two-lane combo (recap)",
+   "intro": "Both sides at once. Grandpa can't be in two places. The fence can.",
+   "outro": "Delegation: it's not just for management.",
+   "night_length": 45,
+   "budget": 3,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 2,
+    "text": "use 2 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "barbed": 1,
+    "wood": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 7,
+     "gap": 1.5
+    },
+    {
+     "t": 2,
+     "type": "shambler",
+     "hour": 3,
+     "count": 4,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     }
+    ]
+   },
+   "shot_t": 18,
+   "id": 5,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Couch to 5K",
+   "idea": "Joggers arrive first and in bursts; the cheap answer is still the right post",
+   "new": "Jogger (fast zombie)",
+   "intro": "Still wearing the fitness tracker. They hit the fence in 4 seconds flat.",
+   "outro": "Their step count was impressive. Their arrival was not.",
+   "night_length": 30,
+   "budget": 2,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 2,
+    "text": "use 2 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "barbed": 1,
+    "wood": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 6,
+     "count": 5,
+     "gap": 1.0
+    },
+    {
+     "t": 4,
+     "type": "jogger",
+     "hour": 0,
+     "count": 4,
+     "gap": 1.2
+    },
+    {
+     "t": 12,
+     "type": "shambler",
+     "hour": 0,
+     "count": 2,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p6",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f0"
+     }
+    ]
+   },
+   "shot_t": 8,
+   "id": 6,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Sticky Situation",
+   "idea": "Molasses next to a fence slows walking AND chewing",
+   "new": "Molasses puddle",
+   "intro": "Grandma's molasses. Zombies in it walk at a third of the speed and chew at half.",
+   "outro": "Slow and steady loses the race. That's the point.",
+   "night_length": 40,
+   "budget": 4,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 4,
+    "text": "use 4 planks or less"
+   },
+   "farmer_locked": true,
+   "pieces": {
+    "barbed": 1,
+    "molasses": 2,
+    "wood": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 5,
+     "gap": 2.0
+    },
+    {
+     "t": 1,
+     "type": "jogger",
+     "hour": 3,
+     "count": 3,
+     "gap": 1.0
+    }
+   ],
+   "solution": {
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     },
+     {
+      "piece": "molasses",
+      "slot": "n3"
+     }
+    ],
+    "farmer": "c"
+   },
+   "shot_t": 20,
+   "id": 7,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c"
+  },
+  {
+   "name": "The Pointy End",
+   "idea": "Spike strips damage everything that walks over them",
+   "new": "Spike strip",
+   "intro": "Spikes soften them up on the way in. A soft zombie is a short zombie.",
+   "outro": "Turns out shoes were the one thing they really needed.",
+   "night_length": 40,
+   "budget": 4,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 4,
+    "text": "use 4 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "spike": 2,
+    "barbed": 1,
+    "molasses": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 6,
+     "gap": 1.5
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 5,
+     "gap": 2.0
+    },
+    {
+     "t": 3,
+     "type": "jogger",
+     "hour": 3,
+     "count": 3,
+     "gap": 1.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "spike",
+      "slot": "o3"
+     },
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     }
+    ]
+   },
+   "shot_t": 16,
+   "id": 8,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Blow-Up Bessie",
+   "idea": "A decoy pulls zombies off their lane and holds them while the farmer works",
+   "new": "Blow-Up Bessie (decoy)",
+   "intro": "She's inflatable, she's fabulous, and zombies can't resist her.",
+   "outro": "Bessie (the real one) was not consulted about the likeness.",
+   "night_length": 28,
+   "budget": 2,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 2,
+    "text": "use 2 planks or less"
+   },
+   "fences": "WWW.WWWWW.WW",
+   "pieces": {
+    "farmer": 1,
+    "cow_decoy": 1,
+    "wood": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 5,
+     "gap": 2.0
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 4,
+     "gap": 1.5
+    }
+   ],
+   "solution": {
+    "farmer": "p3",
+    "pieces": [
+     {
+      "piece": "cow_decoy",
+      "slot": "o9"
+     }
+    ]
+   },
+   "shot_t": 14,
+   "id": 9,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Dress Rehearsal",
+   "idea": "Exam: everything so far, three lanes, one budget",
+   "new": "Exam (no new piece)",
+   "intro": "Three sides, fast and slow. You know every tool on the bench.",
+   "outro": "Pack 1, part 1: certified Fence Fixer. Grandpa's proud. He's asleep, but proud.",
+   "night_length": 50,
+   "budget": 7,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "fences_standing",
+    "value": 6,
+    "text": "no fence breaks, 6 planks or less"
+   },
+   "fences": "WWWWWW.WWWWW",
+   "pieces": {
+    "farmer": 1,
+    "wood": 2,
+    "barbed": 2,
+    "molasses": 1,
+    "spike": 2,
+    "cow_decoy": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 6,
+     "count": 4,
+     "gap": 1.0
+    },
+    {
+     "t": 2,
+     "type": "shambler",
+     "hour": 9,
+     "count": 6,
+     "gap": 2.0
+    },
+    {
+     "t": 5,
+     "type": "shambler",
+     "hour": 3,
+     "count": 5,
+     "gap": 2.0
+    },
+    {
+     "t": 14,
+     "type": "jogger",
+     "hour": 3,
+     "count": 3,
+     "gap": 1.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f6"
+     },
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     },
+     {
+      "piece": "spike",
+      "slot": "o3"
+     }
+    ]
+   },
+   "shot_t": 20,
+   "id": 10,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Doc's on the Radio",
+   "idea": "A bite is not a loss: darts cure, and the farmer cleans up",
+   "new": "Vaccine darts (auto-cure 1 s after a bite)",
+   "intro": "The hardware store's closed, but Doc Hooves left darts. Bites happen. Turning doesn't have to.",
+   "outro": "Doc says: 'Two darts, no lollipop.'",
+   "night_length": 30,
+   "budget": 6,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 4,
+    "text": "use 4 planks or less"
+   },
+   "fences": "WWWWWW.WWWWW",
+   "pieces": {
+    "farmer": 1,
+    "dart": 3
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 6,
+     "r": 150
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 140
+    },
+    {
+     "kind": "pig",
+     "hour": 7,
+     "r": 140
+    },
+    {
+     "kind": "pig",
+     "hour": 0,
+     "r": 60
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 60
+    },
+    {
+     "kind": "cow",
+     "hour": 9,
+     "r": 60
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 6,
+     "count": 3,
+     "gap": 1.0
+    }
+   ],
+   "solution": {
+    "farmer": "p6",
+    "pieces": [
+     {
+      "piece": "dart"
+     },
+     {
+      "piece": "dart"
+     }
+    ]
+   },
+   "shot_t": 10,
+   "id": 11,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Triage Math",
+   "idea": "Darts are insurance; the third star means you never needed them",
+   "new": "'No darts fired' star rule",
+   "intro": "Planks or darts? Grandma says an ounce of fence is worth a pound of cure.",
+   "outro": "Prevention: cheaper than vet bills since 1952.",
+   "night_length": 40,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "no_darts",
+    "value": 5,
+    "text": "fire no darts"
+   },
+   "fences": ".WWWWWWWWWWW",
+   "pieces": {
+    "farmer": 1,
+    "wood": 2,
+    "barbed": 1,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 6,
+     "gap": 1.5
+    },
+    {
+     "t": 1,
+     "type": "jogger",
+     "hour": 9,
+     "count": 4,
+     "gap": 1.5
+    },
+    {
+     "t": 6,
+     "type": "shambler",
+     "hour": 0,
+     "count": 2,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p3",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f9"
+     },
+     {
+      "piece": "wood",
+      "slot": "f0"
+     }
+    ]
+   },
+   "shot_t": 14,
+   "id": 12,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Crow-d Control",
+   "idea": "Crows fly over fences; only defenders inside the pen can hit them",
+   "new": "Crow Flock + Scarecrow",
+   "intro": "Fences mean nothing to a crow. Scarecrow Sally means a lot.",
+   "outro": "Sally would like it known that she is 'more of a crow consultant'.",
+   "night_length": 30,
+   "budget": 3,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 3,
+    "text": "use 3 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "scarecrow": 1,
+    "dart": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 0,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 4,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 8,
+     "r": 80
+    },
+    {
+     "kind": "pig",
+     "hour": 2,
+     "r": 40
+    },
+    {
+     "kind": "pig",
+     "hour": 10,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 6,
+     "r": 40
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "crow",
+     "hour": 0,
+     "count": 3,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p0",
+    "pieces": [
+     {
+      "piece": "scarecrow",
+      "slot": "c"
+     }
+    ]
+   },
+   "shot_t": 8,
+   "id": 13,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Chicken Run",
+   "idea": "Crows always hunt the smallest animal; defend the chickens, not the lane",
+   "new": "Crow targeting (smallest first)",
+   "intro": "Crows from both sides, and they only want the chickens.",
+   "outro": "The cows were offended nobody tried to eat them.",
+   "night_length": 32,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 3,
+    "text": "use 3 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "scarecrow": 1,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 6,
+     "r": 90
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 100
+    },
+    {
+     "kind": "chicken",
+     "hour": 7,
+     "r": 100
+    },
+    {
+     "kind": "cow",
+     "hour": 0,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 3,
+     "r": 80
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 80
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "crow",
+     "hour": 3,
+     "count": 1,
+     "gap": 2.0
+    },
+    {
+     "t": 4,
+     "type": "crow",
+     "hour": 9,
+     "count": 1,
+     "gap": 2.0
+    },
+    {
+     "t": 9,
+     "type": "crow",
+     "hour": 3,
+     "count": 1,
+     "gap": 2.0
+    },
+    {
+     "t": 13,
+     "type": "crow",
+     "hour": 9,
+     "count": 1,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p6",
+    "pieces": [
+     {
+      "piece": "scarecrow",
+      "slot": "c"
+     }
+    ]
+   },
+   "shot_t": 8,
+   "id": 14,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Rubber Chicken Gambit",
+   "idea": "A rubber chicken pulls every crow to a spot you choose",
+   "new": "Rubber chicken (crow decoy)",
+   "intro": "It squeaks. Crows can't resist. Make them fly past Sally to get to it.",
+   "outro": "Squeak squeak. Bonk.",
+   "night_length": 34,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 4,
+    "text": "use 4 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "scarecrow": 1,
+    "rubber_chicken": 2,
+    "dart": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 0,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 4,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 8,
+     "r": 80
+    },
+    {
+     "kind": "pig",
+     "hour": 2,
+     "r": 40
+    },
+    {
+     "kind": "pig",
+     "hour": 10,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 6,
+     "r": 40
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "crow",
+     "hour": 0,
+     "count": 2,
+     "gap": 3.0
+    },
+    {
+     "t": 2,
+     "type": "crow",
+     "hour": 6,
+     "count": 2,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p3",
+    "pieces": [
+     {
+      "piece": "scarecrow",
+      "slot": "c"
+     },
+     {
+      "piece": "rubber_chicken",
+      "slot": "p9"
+     }
+    ]
+   },
+   "shot_t": 10,
+   "id": 15,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Bucket List",
+   "idea": "Armor soaks the first 250 damage: don't trade hits with buckets, slow them until sunrise",
+   "new": "Bucket Farmer (armored)",
+   "intro": "They're wearing buckets. Grandpa's pitchfork just goes 'tink'.",
+   "outro": "Bucket list: your livestock. Bucket list: crossed off. Bucket list: not today.",
+   "night_length": 45,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 2,
+    "text": "use 2 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "wood": 2,
+    "barbed": 1,
+    "molasses": 2,
+    "spike": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "bucket",
+     "hour": 3,
+     "count": 4,
+     "gap": 3.0
+    },
+    {
+     "t": 4,
+     "type": "shambler",
+     "hour": 9,
+     "count": 4,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "molasses",
+      "slot": "n3"
+     }
+    ]
+   },
+   "shot_t": 20,
+   "id": 16,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Whack-a-Bucket",
+   "idea": "Blunt hits knock buckets off 1.5x faster",
+   "new": "Gopher Whacker (blunt trap)",
+   "intro": "A mallet on a spring. Buckets go CLANG. Very satisfying.",
+   "outro": "CLANG. CLANG. CLANG. Grandma wants earplugs.",
+   "night_length": 45,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 5,
+    "text": "tuck in every zombie before sunrise"
+   },
+   "farmer_locked": true,
+   "pieces": {
+    "wood": 2,
+    "whacker": 1,
+    "barbed": 1,
+    "molasses": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "bucket",
+     "hour": 3,
+     "count": 5,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "pieces": [
+     {
+      "piece": "whacker",
+      "slot": "n3"
+     },
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     }
+    ],
+    "farmer": "c"
+   },
+   "shot_t": 22,
+   "id": 17,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c"
+  },
+  {
+   "name": "Not by the Hair of My Chinny Chin Chin",
+   "idea": "Brick walls: expensive, slow to chew, no damage",
+   "new": "Brick wall",
+   "intro": "Three little pigs. You know how this goes. Build the right house.",
+   "outro": "The big bad horde huffed. It puffed. It went home at sunrise.",
+   "night_length": 32,
+   "budget": 6,
+   "min_keep": 2,
+   "three_star": {
+    "rule": "budget",
+    "value": 5,
+    "text": "use 5 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "wood": 2,
+    "barbed": 1,
+    "brick": 1
+   },
+   "animals": [
+    {
+     "kind": "pig",
+     "hour": 2,
+     "r": 90
+    },
+    {
+     "kind": "pig",
+     "hour": 6,
+     "r": 90
+    },
+    {
+     "kind": "pig",
+     "hour": 10,
+     "r": 90
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 2,
+     "count": 6,
+     "gap": 1.5
+    },
+    {
+     "t": 1,
+     "type": "jogger",
+     "hour": 6,
+     "count": 4,
+     "gap": 1.5
+    },
+    {
+     "t": 3,
+     "type": "shambler",
+     "hour": 10,
+     "count": 4,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p6",
+    "pieces": [
+     {
+      "piece": "brick",
+      "slot": "f2"
+     },
+     {
+      "piece": "barbed",
+      "slot": "f10"
+     }
+    ]
+   },
+   "shot_t": 18,
+   "id": 18,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Gopher Broke",
+   "idea": "Diggers tunnel under fences; only whackers hit them underground",
+   "new": "Digger",
+   "intro": "Fences? Never heard of 'em. Watch for dirt mounds.",
+   "outro": "Gopher broke, gopher home.",
+   "night_length": 35,
+   "budget": 7,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 6,
+    "text": "use 6 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "whacker": 2,
+    "brick": 1,
+    "dart": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "digger",
+     "hour": 6,
+     "count": 2,
+     "gap": 3.0
+    },
+    {
+     "t": 1,
+     "type": "digger",
+     "hour": 0,
+     "count": 2,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "p0",
+    "pieces": [
+     {
+      "piece": "whacker",
+      "slot": "o6"
+     },
+     {
+      "piece": "whacker",
+      "slot": "n6"
+     }
+    ]
+   },
+   "shot_t": 12,
+   "id": 19,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Midterms",
+   "idea": "Exam: crows, buckets and diggers on three lanes",
+   "new": "Exam (no new piece)",
+   "intro": "Everything with a bucket, a beak or a shovel. Pick your fights.",
+   "outro": "Grade: A. Grandpa's grade: Z (asleep).",
+   "night_length": 45,
+   "budget": 9,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 6,
+    "text": "tuck in every zombie, 6 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "wood": 1,
+    "barbed": 1,
+    "molasses": 1,
+    "whacker": 2,
+    "scarecrow": 1,
+    "rubber_chicken": 1,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 0,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 4,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 8,
+     "r": 80
+    },
+    {
+     "kind": "pig",
+     "hour": 2,
+     "r": 40
+    },
+    {
+     "kind": "pig",
+     "hour": 10,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 6,
+     "r": 40
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "bucket",
+     "hour": 3,
+     "count": 3,
+     "gap": 3.0
+    },
+    {
+     "t": 2,
+     "type": "digger",
+     "hour": 9,
+     "count": 3,
+     "gap": 3.0
+    },
+    {
+     "t": 6,
+     "type": "crow",
+     "hour": 0,
+     "count": 2,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "c",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     },
+     {
+      "piece": "scarecrow",
+      "slot": "p3"
+     },
+     {
+      "piece": "rubber_chicken",
+      "slot": "n3"
+     }
+    ]
+   },
+   "shot_t": 16,
+   "id": 20,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "For Whom the Bell Tolls",
+   "idea": "The bell stuns everything near it every 6 s: crowd control scales with crowd size",
+   "new": "Church bell (area stun)",
+   "intro": "Preacher Pete lent us his bell. One DONG and the whole crowd takes a nap.",
+   "outro": "It tolls for thee. 'Thee' is the zombies.",
+   "night_length": 40,
+   "budget": 6,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 4,
+    "text": "tuck in every zombie, 4 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "bell": 1,
+    "wood": 2,
+    "barbed": 1,
+    "molasses": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 2,
+     "count": 5,
+     "gap": 1.5
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 5,
+     "gap": 1.5
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 4,
+     "count": 5,
+     "gap": 1.5
+    }
+   ],
+   "solution": {
+    "farmer": "p2",
+    "pieces": [
+     {
+      "piece": "bell",
+      "slot": "p3"
+     }
+    ]
+   },
+   "shot_t": 18,
+   "id": 21,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Saved by the Bell",
+   "idea": "A bell in the middle protects the herd from whatever gets in",
+   "new": "Bell inside the pen (defend, not block)",
+   "intro": "Holes everywhere, nothing to patch them with. Ring it from the middle.",
+   "outro": "Class dismissed. The zombies did not do the reading.",
+   "night_length": 35,
+   "budget": 5,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "no_darts",
+    "value": 4,
+    "text": "fire no darts"
+   },
+   "fences": "W.WW.WW.WW.W",
+   "pieces": {
+    "farmer": 1,
+    "bell": 1,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 0,
+     "r": 50
+    },
+    {
+     "kind": "chicken",
+     "hour": 6,
+     "r": 50
+    },
+    {
+     "kind": "pig",
+     "hour": 3,
+     "r": 50
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 50
+    },
+    {
+     "kind": "cow",
+     "hour": 0,
+     "r": 0
+    },
+    {
+     "kind": "cow",
+     "hour": 6,
+     "r": 100
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 1,
+     "count": 2,
+     "gap": 2.0
+    },
+    {
+     "t": 3,
+     "type": "jogger",
+     "hour": 4,
+     "count": 2,
+     "gap": 2.0
+    },
+    {
+     "t": 6,
+     "type": "jogger",
+     "hour": 7,
+     "count": 2,
+     "gap": 2.0
+    },
+    {
+     "t": 9,
+     "type": "jogger",
+     "hour": 10,
+     "count": 2,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p0",
+    "pieces": [
+     {
+      "piece": "bell",
+      "slot": "c"
+     }
+    ]
+   },
+   "shot_t": 12,
+   "id": 22,
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Big Tiny",
+   "idea": "The Brute ignores decoys and hits fences 3x; slow him and outlast him",
+   "new": "Big Tiny (Brute)",
+   "intro": "Foam finger. Big grudge. Hits fences three times as hard.",
+   "outro": "Big Tiny went home to think about what he did.",
+   "night_length": 40,
+   "budget": 8,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 5,
+    "text": "use 5 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "brick": 1,
+    "molasses": 2,
+    "barbed": 1,
+    "cow_decoy": 1,
+    "spike": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "brute",
+     "hour": 3,
+     "count": 1,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p3",
+    "pieces": [
+     {
+      "piece": "brick",
+      "slot": "f3"
+     },
+     {
+      "piece": "molasses",
+      "slot": "n3"
+     }
+    ]
+   },
+   "shot_t": 24,
+   "id": 23,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Shock and Awww",
+   "idea": "Electric fences shred crowds of small zombies",
+   "new": "Electric fence",
+   "intro": "Grandpa wired the fence to the tractor battery. Do not lick it.",
+   "outro": "Bzzzt. Hair: permanently fabulous.",
+   "night_length": 40,
+   "budget": 6,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 4,
+    "text": "tuck in every zombie, 4 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "electric": 1,
+    "barbed": 1,
+    "brick": 1,
+    "wood": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 0,
+     "count": 12,
+     "gap": 0.8
+    },
+    {
+     "t": 2,
+     "type": "jogger",
+     "hour": 0,
+     "count": 6,
+     "gap": 0.8
+    },
+    {
+     "t": 4,
+     "type": "shambler",
+     "hour": 6,
+     "count": 5,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p6",
+    "pieces": [
+     {
+      "piece": "electric",
+      "slot": "f0"
+     }
+    ]
+   },
+   "shot_t": 12,
+   "id": 24,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Buffet Barry",
+   "idea": "Bloaters spit from range and burst on death; kill them outside the pen",
+   "new": "Buffet Barry (Bloater)",
+   "intro": "Ate the buffet. Is the buffet. Don't pop him near the herd.",
+   "outro": "Glitter goo everywhere. Grandma's not cleaning that.",
+   "night_length": 45,
+   "budget": 6,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 4,
+    "text": "tuck in every Barry, 4 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "spike": 2,
+    "scarecrow": 1,
+    "brick": 1,
+    "dart": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "bloater",
+     "hour": 3,
+     "count": 2,
+     "gap": 6.0
+    },
+    {
+     "t": 0,
+     "type": "bloater",
+     "hour": 9,
+     "count": 1,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "spike",
+      "slot": "o3"
+     },
+     {
+      "piece": "spike",
+      "slot": "o9"
+     }
+    ]
+   },
+   "shot_t": 24,
+   "id": 25,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "All You Can Eat",
+   "idea": "Decoys park Barry exactly where your spikes are",
+   "new": "Decoy + spike kill zone vs ranged",
+   "intro": "Grandpa's at the actual buffet. No planks, a hole at 5, and Barry stops to spit at whatever's in front of him.",
+   "outro": "Barry left a one-star review. 'Too pointy.'",
+   "night_length": 45,
+   "farmer_locked": true,
+   "budget": 6,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 4,
+    "text": "tuck in every zombie, 4 planks or less"
+   },
+   "fences": "WWWWW.WWWWWW",
+   "pieces": {
+    "spike": 1,
+    "cow_decoy": 1,
+    "scarecrow": 1,
+    "dart": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "bloater",
+     "hour": 5,
+     "count": 3,
+     "gap": 7.0
+    }
+   ],
+   "solution": {
+    "farmer": "c",
+    "pieces": [
+     {
+      "piece": "cow_decoy",
+      "slot": "n5"
+     },
+     {
+      "piece": "spike",
+      "slot": "o5"
+     }
+    ]
+   },
+   "shot_t": 20,
+   "id": 26,
+   "farmer": "c"
+  },
+  {
+   "name": "Rush Hour",
+   "idea": "One side, everything at once: layer slow, damage and stun",
+   "new": "Layering (no new piece)",
+   "intro": "The whole county took the same road tonight.",
+   "outro": "Traffic report: zombie gridlock at the Breeze farm.",
+   "night_length": 45,
+   "budget": 10,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 6,
+    "text": "tuck in every zombie, 6 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "electric": 1,
+    "barbed": 2,
+    "molasses": 1,
+    "spike": 2,
+    "bell": 1
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 2,
+     "count": 8,
+     "gap": 1.0
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 8,
+     "gap": 1.0
+    },
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 4,
+     "count": 6,
+     "gap": 1.0
+    },
+    {
+     "t": 6,
+     "type": "bucket",
+     "hour": 3,
+     "count": 3,
+     "gap": 3.0
+    }
+   ],
+   "solution": {
+    "farmer": "c",
+    "pieces": [
+     {
+      "piece": "spike",
+      "slot": "n3"
+     },
+     {
+      "piece": "bell",
+      "slot": "p3"
+     }
+    ]
+   },
+   "shot_t": 20,
+   "id": 27,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Four-Way Stop",
+   "idea": "Four lanes, four different loads: match the tool to the lane",
+   "new": "Per-lane budgeting (no new piece)",
+   "intro": "Grandpa's back went out again. Every road has traffic, and no two roads are the same.",
+   "outro": "Four-way stop. Zombies don't know who goes first either.",
+   "night_length": 30,
+   "budget": 8,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 6,
+    "text": "use 6 planks or less"
+   },
+   "farmer_locked": true,
+   "pieces": {
+    "barbed": 3,
+    "spike": 2,
+    "molasses": 2,
+    "wood": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 0,
+     "count": 2,
+     "gap": 3.0
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 4,
+     "gap": 3.0
+    },
+    {
+     "t": 0,
+     "type": "jogger",
+     "hour": 6,
+     "count": 5,
+     "gap": 1.5
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 9,
+     "count": 5,
+     "gap": 1.5
+    }
+   ],
+   "solution": {
+    "farmer": "c",
+    "pieces": [
+     {
+      "piece": "barbed",
+      "slot": "f3"
+     },
+     {
+      "piece": "barbed",
+      "slot": "f6"
+     },
+     {
+      "piece": "molasses",
+      "slot": "o9"
+     }
+    ]
+   },
+   "shot_t": 16,
+   "id": 28,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c"
+  },
+  {
+   "name": "Fowl Weather",
+   "idea": "Exam: air, underground and ranged at once",
+   "new": "Exam (no new piece)",
+   "intro": "Crows above, gophers below, Barry in the middle. Sally's on double shift.",
+   "outro": "Forecast: 100% chance of you being great at this.",
+   "night_length": 45,
+   "budget": 10,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "cleared",
+    "value": 6,
+    "text": "tuck in every zombie, 6 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "scarecrow": 1,
+    "rubber_chicken": 1,
+    "whacker": 2,
+    "spike": 2,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 0,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 4,
+     "r": 80
+    },
+    {
+     "kind": "chicken",
+     "hour": 8,
+     "r": 80
+    },
+    {
+     "kind": "pig",
+     "hour": 2,
+     "r": 40
+    },
+    {
+     "kind": "pig",
+     "hour": 10,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 6,
+     "r": 40
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "crow",
+     "hour": 0,
+     "count": 3,
+     "gap": 3.0
+    },
+    {
+     "t": 2,
+     "type": "digger",
+     "hour": 6,
+     "count": 3,
+     "gap": 3.0
+    },
+    {
+     "t": 4,
+     "type": "bloater",
+     "hour": 3,
+     "count": 1,
+     "gap": 2.0
+    }
+   ],
+   "solution": {
+    "farmer": "c",
+    "pieces": [
+     {
+      "piece": "scarecrow",
+      "slot": "p0"
+     },
+     {
+      "piece": "rubber_chicken",
+      "slot": "p3"
+     },
+     {
+      "piece": "spike",
+      "slot": "o3"
+     }
+    ]
+   },
+   "shot_t": 16,
+   "id": 29,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  },
+  {
+   "name": "Big Tiny's Birthday Party",
+   "idea": "Finale: two Brutes with an escort; every tool, one budget",
+   "new": "Finale",
+   "intro": "It's Big Tiny's birthday. He brought his cousin, Medium Tiny, and some friends.",
+   "outro": "Happy birthday, Big Tiny. Pack 1 complete: your farm name goes on the Wall of Fixers.",
+   "night_length": 40,
+   "budget": 15,
+   "min_keep": 5,
+   "three_star": {
+    "rule": "budget",
+    "value": 12,
+    "text": "use 12 planks or less"
+   },
+   "pieces": {
+    "farmer": 1,
+    "brick": 2,
+    "electric": 1,
+    "molasses": 2,
+    "spike": 2,
+    "bell": 1,
+    "barbed": 1,
+    "dart": 2
+   },
+   "animals": [
+    {
+     "kind": "chicken",
+     "hour": 1,
+     "r": 70
+    },
+    {
+     "kind": "chicken",
+     "hour": 5,
+     "r": 70
+    },
+    {
+     "kind": "pig",
+     "hour": 9,
+     "r": 60
+    },
+    {
+     "kind": "pig",
+     "hour": 11,
+     "r": 80
+    },
+    {
+     "kind": "cow",
+     "hour": 7,
+     "r": 40
+    },
+    {
+     "kind": "cow",
+     "hour": 3,
+     "r": 50
+    }
+   ],
+   "waves": [
+    {
+     "t": 0,
+     "type": "brute",
+     "hour": 3,
+     "count": 1,
+     "gap": 2.0
+    },
+    {
+     "t": 8,
+     "type": "brute",
+     "hour": 9,
+     "count": 1,
+     "gap": 2.0
+    },
+    {
+     "t": 0,
+     "type": "shambler",
+     "hour": 3,
+     "count": 4,
+     "gap": 2.0
+    },
+    {
+     "t": 4,
+     "type": "jogger",
+     "hour": 9,
+     "count": 3,
+     "gap": 1.5
+    }
+   ],
+   "solution": {
+    "farmer": "p9",
+    "pieces": [
+     {
+      "piece": "brick",
+      "slot": "f3"
+     },
+     {
+      "piece": "molasses",
+      "slot": "n3"
+     },
+     {
+      "piece": "spike",
+      "slot": "o3"
+     },
+     {
+      "piece": "brick",
+      "slot": "f9"
+     },
+     {
+      "piece": "molasses",
+      "slot": "o9"
+     }
+    ]
+   },
+   "shot_t": 24,
+   "id": 30,
+   "fences": "WWWWWWWWWWWW",
+   "farmer": "c",
+   "farmer_locked": false
+  }
+ ]
+}

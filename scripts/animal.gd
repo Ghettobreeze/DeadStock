@@ -3,9 +3,12 @@ extends Node2D
 ## A bitten animal is INFECTED and turns into a ZOMBIE when its timer runs out,
 ## unless the player saves it (carry to the barn), cures it (vaccine) or culls it.
 
-enum State { HEALTHY, INFECTED, CARRIED, ZOMBIE }
+enum State { HEALTHY, INFECTED, CARRIED, ZOMBIE, SAFE }  # SAFE = saved, inside the barn until dawn
 
-const INFECT_DURATION := 6.0
+## Turn timer now comes from main.turn_timer (captain test build: default 8 s, cycle with T).
+var infect_total := 12.0
+var bitten_at := 0.0
+var contact_time := 0.0  # auto-carry: seconds the farmer has been touching this animal
 
 const KINDS := {
 	"chicken": {"radius": 9.0, "color": Color(0.98, 0.93, 0.55), "speed": 55.0, "payout": 3, "zhp": 30.0},
@@ -56,10 +59,14 @@ func infect() -> void:
 	if state != State.HEALTHY:
 		return
 	state = State.INFECTED
-	infect_time = INFECT_DURATION
+	infect_total = main.turn_timer
+	infect_time = infect_total
+	bitten_at = main.night_time
+	contact_time = 0.0
 
 
 func cure() -> void:
+	visible = true
 	state = State.HEALTHY
 	infect_time = 0.0
 	flash = 0.5
@@ -103,6 +110,8 @@ func tick(delta: float) -> void:
 				main.on_animal_turned(self)
 		State.ZOMBIE:
 			_zombie_tick(delta)
+		State.SAFE:
+			visible = false
 	queue_redraw()
 
 
@@ -154,7 +163,7 @@ func _draw() -> void:
 	draw_circle(wobble + Vector2(-radius * 0.05, -radius * 0.3), 2.2, eye)
 	var font := ThemeDB.fallback_font
 	if state == State.INFECTED or state == State.CARRIED:
-		draw_arc(Vector2.ZERO, radius + 6, -PI / 2, -PI / 2 + TAU * (infect_time / INFECT_DURATION), 24, Color(0.75, 0.3, 1.0), 3.0)
+		draw_arc(Vector2.ZERO, radius + 6, -PI / 2, -PI / 2 + TAU * (infect_time / infect_total), 24, Color(0.75, 0.3, 1.0), 3.0)
 		draw_string(font, Vector2(-6, -radius - 10), str(ceil(infect_time)), HORIZONTAL_ALIGNMENT_CENTER, -1, 14, Color(1, 0.85, 1))
 	if state == State.ZOMBIE:
 		var w := radius * 2.2

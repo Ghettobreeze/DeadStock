@@ -30,15 +30,17 @@ func tick(delta: float) -> void:
 		dir.y -= 1
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
 		dir.y += 1
+	if main.touch_dir != Vector2.ZERO:
+		dir = main.touch_dir
 	if bot_input != Vector2.ZERO:
 		dir = bot_input
 	if dir != Vector2.ZERO:
-		dir = dir.normalized()
+		dir = dir.limit_length(1.0) if main.touch_dir != Vector2.ZERO and bot_input == Vector2.ZERO else dir.normalized()
 		if absf(dir.x) > 0.1:
 			facing = signf(dir.x)
-	var s := speed * (0.7 if carrying else 1.0)
+	var s := speed * (0.8 if carrying else 1.0)  # UX spec: carry at 80 % speed
 	position += dir * s * delta
-	position = position.clamp(Vector2(20, 70), Vector2(1260, 700))
+	position = position.clamp(main.farmer_min, main.farmer_max)
 
 	attack_cd = max(0.0, attack_cd - delta)
 	swing_time = max(0.0, swing_time - delta)
