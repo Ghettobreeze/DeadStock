@@ -42,16 +42,16 @@ func tick(delta: float) -> void:
 	if bot_input != Vector2.ZERO:
 		dir = bot_input
 	if dir != Vector2.ZERO:
-		dir = dir.limit_length(1.0) if main.touch_dir != Vector2.ZERO and bot_input == Vector2.ZERO else dir.normalized()
+		dir = dir.limit_length(1.0) if (main.touch_dir != Vector2.ZERO or bot_input != Vector2.ZERO) else dir.normalized()
 		if absf(dir.x) > 0.1:
 			facing = signf(dir.x)
-	var s := speed * (0.8 if carrying else 1.0)  # UX spec: carry at 80 % speed
+	var s: float = speed * (float(main.carry_mult) if carrying else 1.0)  # UX spec: carry at 80 % speed
 	position += dir * s * delta
 	position = position.clamp(main.farmer_min, main.farmer_max)
 
 	attack_cd = max(0.0, attack_cd - delta)
 	swing_time = max(0.0, swing_time - delta)
-	stamina = minf(max_stamina(), stamina + STAMINA_REGEN * delta)
+	stamina = minf(max_stamina(), stamina + float(main.STAMINA_REGEN) * delta)
 	if attack_cd <= 0.0 and stamina >= 1.0:
 		var target: Node2D = main.nearest_enemy(position, reach)
 		if target:
@@ -61,6 +61,8 @@ func tick(delta: float) -> void:
 			attack_cd = attack_rate
 			stamina -= 1.0
 			if target.hp <= 0.0:
+				if main.stats.has("fork_kills"):
+					main.stats["fork_kills"] += 1
 				main.on_enemy_killed(target)
 	queue_redraw()
 

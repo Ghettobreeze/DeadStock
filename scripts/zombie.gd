@@ -41,7 +41,7 @@ func setup(m: Node2D, night: int, type := "walker") -> void:
 	max_hp = (45.0 + 7.0 * (night - 1)) * float(d["hp"]) * randf_range(1.0 - HP_JITTER, 1.0 + HP_JITTER)
 	hp = max_hp
 	speed = (randf_range(38.0, 52.0) + 2.0 * night) * float(d["speed"])
-	chew_dps = (9.0 + 2.0 * night) * float(d["chew"])
+	chew_dps = (float(main.CHEW_BASE) + float(main.CHEW_PER_NIGHT) * night) * float(d["chew"])
 	radius = d["r"]
 	spike_mult = d["spike"]
 	t = randf() * 10.0
@@ -77,17 +77,19 @@ func tick(delta: float) -> void:
 			var seg: int = main.segment_at(position)
 			if main.fence_hp[seg] > 0.0 and not main.claim_chew(seg):
 				# section is crowded: shuffle along the fence toward a neighbour
-				position = main.pen_center + (position - main.pen_center).rotated(slide_dir * 0.5 * delta)
+				position = main.pen_center + (position - main.pen_center).rotated(slide_dir * float(main.SLIDE_RATE) * delta)
 			elif main.fence_hp[seg] > 0.0:
 				chewing = true
 				main.damage_fence(seg, chew_dps * delta)
 				if main.pieces.get(seg, "") == "spikes" and spike_mult > 0.0:
 					take_damage(main.spike_dps() * spike_mult * delta)
 					if hp <= 0.0:
+						main.stats["spike_kills"] = int(main.stats.get("spike_kills", 0)) + 1
 						main.on_enemy_killed(self)
 						return
 			else:
 				inside = true
+				main.stats["breaches"] = int(main.stats.get("breaches", 0)) + 1
 				position += to_center.normalized() * 14.0
 		else:
 			position = position.move_toward(aim, speed * delta)
@@ -140,7 +142,7 @@ func _draw() -> void:
 		skin = Color(1, 1, 1)
 	if ztype == "bloater" and position.distance_to(main.pen_center) < main.pen_radius + 60.0:
 		# danger ring: everything inside this gets bitten when it bursts
-		draw_arc(Vector2.ZERO, BURST_RADIUS, 0, TAU, 32, Color(0.85, 0.4, 1.0, 0.35 + 0.2 * sin(t * 6.0)), 2.0)
+		draw_arc(Vector2.ZERO, float(main.BURST_RADIUS), 0, TAU, 32, Color(0.85, 0.4, 1.0, 0.35 + 0.2 * sin(t * 6.0)), 2.0)
 	draw_circle(Vector2(0, radius * 0.8), radius, Color(0, 0, 0, 0.2))
 	var dir: Vector2 = (main.pen_center - position).normalized() if not inside else Vector2.RIGHT.rotated(sin(t) * 0.5)
 	var side := dir.orthogonal()
