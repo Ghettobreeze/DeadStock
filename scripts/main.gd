@@ -602,6 +602,7 @@ func _fresh_panel() -> bool:
 
 func _enter_day() -> void:
 	phase = Phase.DAY
+	print("[phase] day ", night)
 	panel_opened_ms = Time.get_ticks_msec()
 	raids_today = 0
 	if county_panel:
@@ -623,6 +624,7 @@ func start_night() -> void:
 	planks = PLANKS_BASE + fence_level + bonus_planks + int(PLANKS_PER_LANE * plan.size())
 	bonus_planks = 0
 	phase = Phase.DUSK
+	print("[phase] dusk ", night)
 	shop_panel.visible = false
 	if county_panel:
 		county_panel.visible = false
@@ -641,6 +643,7 @@ func begin_night() -> void:
 	if phase != Phase.DUSK:
 		return
 	phase = Phase.NIGHT
+	print("[phase] night ", night)
 	dusk_panel.visible = false
 	barricade_base.clear()
 	_dusk_camera(false)
