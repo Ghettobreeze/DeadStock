@@ -11,9 +11,9 @@ var bitten_at := 0.0
 var contact_time := 0.0  # auto-carry: seconds the farmer has been touching this animal
 
 const KINDS := {
-	"chicken": {"radius": 9.0, "color": Color(0.98, 0.93, 0.55), "speed": 55.0, "payout": 3, "zhp": 30.0},
-	"pig": {"radius": 13.0, "color": Color(0.96, 0.66, 0.7), "speed": 40.0, "payout": 6, "zhp": 55.0},
-	"cow": {"radius": 17.0, "color": Color(0.95, 0.95, 0.92), "speed": 32.0, "payout": 10, "zhp": 90.0},
+	"chicken": {"radius": 9.0, "color": Color(0.98, 0.93, 0.55), "speed": 55.0, "payout": 4, "zhp": 30.0},
+	"pig": {"radius": 13.0, "color": Color(0.96, 0.66, 0.7), "speed": 40.0, "payout": 7, "zhp": 55.0},
+	"cow": {"radius": 17.0, "color": Color(0.95, 0.95, 0.92), "speed": 32.0, "payout": 12, "zhp": 90.0},
 }
 
 var kind := "chicken"

@@ -15,11 +15,11 @@ var facing := 1.0
 var t := 0.0
 var bot_input := Vector2.ZERO  # used by the autotest bot
 var stamina := 5.0
-const STAMINA_REGEN := 0.9     # swings per second recovered
+const STAMINA_REGEN := 1.25     # swings per second recovered
 
 
 func max_stamina() -> float:
-	return 4.0 + main.fork_level
+	return 5.0 + main.fork_level
 
 
 func damage() -> float:

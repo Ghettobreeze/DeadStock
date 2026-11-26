@@ -16,7 +16,7 @@ const DEPLOY_MARGIN := 34.0
 ## Unit roles from the economy/combat reports: chicken = kamikaze, pig = melee DPS,
 ## cow = tank, undead = chained zombie animal (hits buildings hard, no feed).
 const UNIT := {
-	"chicken": {"label": "Hen bomber", "hp": 26.0, "dmg": 75.0, "rate": 0.0, "speed": 95.0, "range": 16.0, "r": 8.0, "color": Color(0.98, 0.93, 0.55)},
+	"chicken": {"label": "Hen bomber", "hp": 26.0, "dmg": 90.0, "rate": 0.0, "speed": 95.0, "range": 16.0, "r": 8.0, "color": Color(0.98, 0.93, 0.55)},
 	"pig": {"label": "Pig brawler", "hp": 95.0, "dmg": 14.0, "rate": 0.5, "speed": 70.0, "range": 18.0, "r": 12.0, "color": Color(0.96, 0.66, 0.7)},
 	"cow": {"label": "Cow tank", "hp": 280.0, "dmg": 9.0, "rate": 0.6, "speed": 44.0, "range": 20.0, "r": 16.0, "color": Color(0.95, 0.95, 0.92)},
 	"undead": {"label": "Dead Stock", "hp": 140.0, "dmg": 16.0, "rate": 0.5, "speed": 55.0, "range": 18.0, "r": 13.0, "color": Color(0.72, 0.66, 0.86)},
@@ -25,16 +25,16 @@ const UNIT_ORDER := ["chicken", "pig", "cow", "undead"]
 
 ## Prebuilt rival farms. unlock = the night you must have reached. Buildings: [name, angle deg, dist, hp, loot share]
 const RIVALS := [
-	{"name": "Hog Heaven Retirement Ranch", "owner": "Grandpa Hogg", "unlock": 1, "fence": 55.0, "gaps": 3, "guards": 2, "loot": 60,
+	{"name": "Hog Heaven Retirement Ranch", "owner": "Grandpa Hogg", "unlock": 1, "fence": 55.0, "gaps": 3, "guards": 2, "loot": 40, "guard_hp": 70.0, "guard_dmg": 10.0,
 		"color": Color(0.55, 0.75, 0.95), "taunt": "These hogs are retired. Mostly.",
 		"buildings": [["Silo", 0, 0, 260, 0.4], ["Coop", 140, 95, 160, 0.3], ["Shed", 320, 100, 140, 0.3]]},
-	{"name": "Possum Hollow Feed Lot", "owner": "the Possum Twins", "unlock": 3, "fence": 100.0, "gaps": 1, "guards": 4, "loot": 120,
+	{"name": "Possum Hollow Feed Lot", "owner": "the Possum Twins", "unlock": 3, "fence": 100.0, "gaps": 1, "guards": 4, "loot": 80, "guard_hp": 95.0, "guard_dmg": 14.0,
 		"color": Color(0.9, 0.6, 0.3), "taunt": "The twins say you smell like a cow.",
 		"buildings": [["Silo", 0, 0, 340, 0.35], ["Barn", 90, 100, 300, 0.25], ["Trough", 210, 105, 150, 0.15], ["Shed", 320, 100, 170, 0.25]]},
-	{"name": "GRO-GLO Feed Co. Depot", "owner": "Barron Gristle's interns", "unlock": 5, "fence": 150.0, "gaps": 1, "guards": 6, "loot": 200,
+	{"name": "GRO-GLO Feed Co. Depot", "owner": "Barron Gristle's interns", "unlock": 5, "fence": 150.0, "gaps": 1, "guards": 6, "loot": 140, "guard_hp": 120.0, "guard_dmg": 18.0,
 		"color": Color(0.84, 1.0, 0.25), "taunt": "Glo-Corn: now with 40% more glow.",
 		"buildings": [["Silo", 0, 0, 420, 0.3], ["Warehouse", 60, 105, 380, 0.25], ["Feed Truck", 180, 110, 240, 0.2], ["Office", 300, 105, 260, 0.25]]},
-	{"name": "Mort Muckridge's Rotten Acres", "owner": "Mort Muckridge", "unlock": 7, "fence": 210.0, "gaps": 0, "guards": 8, "loot": 320,
+	{"name": "Mort Muckridge's Rotten Acres", "owner": "Mort Muckridge", "unlock": 7, "fence": 210.0, "gaps": 0, "guards": 8, "loot": 220, "guard_hp": 145.0, "guard_dmg": 22.0,
 		"color": Color(0.85, 0.3, 0.35), "taunt": "Mort is still mad about the pie contest.",
 		"buildings": [["Silo", 0, 0, 520, 0.3], ["Barn", 40, 110, 420, 0.2], ["Pie Stand", 130, 105, 260, 0.15], ["Coop", 220, 110, 280, 0.15], ["Outhouse", 310, 108, 200, 0.2]]},
 ]
@@ -110,7 +110,7 @@ func _build_farm() -> void:
 	var n: int = int(rival["guards"]) + week / 2
 	for i in n:
 		var home := C + Vector2.from_angle(TAU * i / n + rng.randf()) * rng.randf_range(40.0, 140.0)
-		var ghp := 70.0 * scale
+		var ghp := float(rival.get("guard_hp", 70.0)) * scale
 		guards.append({"pos": home, "home": home, "hp": ghp, "max": ghp, "cd": 0.0, "alive": true})
 
 
@@ -167,7 +167,7 @@ func _step(dt: float) -> void:
 			if d > 20.0:
 				g["pos"] = g["pos"].move_toward(u["pos"], 62.0 * dt)
 			elif g["cd"] <= 0.0:
-				_hurt_unit(u, 10.0)
+				_hurt_unit(u, float(rival.get("guard_dmg", 10.0)))
 				g["cd"] = 0.6
 		else:
 			g["pos"] = g["pos"].move_toward(g["home"], 40.0 * dt)
@@ -223,7 +223,7 @@ func _boom(pos: Vector2, dmg: float) -> void:
 		if g["alive"] and g["pos"].distance_to(pos) < 60.0:
 			_hurt_guard(g, dmg)
 	if absf(pos.distance_to(C) - R) < 40.0:
-		_hurt_fence(_segment_at(pos), dmg * 1.5)
+		_hurt_fence(_segment_at(pos), dmg * 3.0)   # hens are the wall-breakers
 
 
 func _hurt_unit(u: Dictionary, dmg: float) -> void:

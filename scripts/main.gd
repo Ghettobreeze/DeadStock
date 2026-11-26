@@ -28,6 +28,7 @@ const ACTION_RANGE := 48.0
 const FAN_RANGE := 70.0          # thumb-lift search radius (world px) for the Action Fan
 const TIMER_STEPS := [6.0, 8.0, 12.0, 16.0, 20.0]
 const NO_WIPE_SHARE := 0.35      # 02_combat: at most 35 % of the herd can turn per night
+const STRICT_GUARD := true       # D-46: timers that expire after the guard is full only spook
 const CHAIN_POSTS_PER_NIGHT := 2
 const BARN_SLOTS := 4             # 02_combat: barn slots = 2 + barn tier (tier 2 here)
 
@@ -61,7 +62,12 @@ var rival_buttons: Array = []
 var at := {}                      # autotest flags
 
 # ---- dusk planning: read the forecast, spend planks on fence sections
-const SPIKE_DPS := 26.0
+const SPIKE_DPS := 18.0          # + SPIKE_DPS_PER_NIGHT x night (spikes keep pace with zombie HP)
+const SPIKE_DPS_PER_NIGHT := 4.0
+const PEN_BASE := 8               # pen holds PEN_BASE + PEN_PER_FENCE x fence level animals
+const PEN_PER_FENCE := 2
+const DEAD_STOCK_CAP := 6
+const LOOT_REPEAT := 0.5         # each repeat raid on the same rival in the same week pays x0.5
 const PIECE_COST := {"barricade": 1, "spikes": 2, "scarecrow": 2}
 const PIECE_INFO := {
 	"barricade": "Barricade (1 plank): that fence section is twice as strong tonight",
@@ -396,7 +402,19 @@ func _resolve(a: Node2D, method: String) -> void:
 	stats[method] += 1
 
 
+func _guard_full() -> bool:
+	return stats["turned"] + int(stats.get("lost_strict", 0)) >= int(ceil(NO_WIPE_SHARE * herd_at_dusk))
+
+
 func on_animal_turned(a: Node2D) -> void:
+	if STRICT_GUARD and _guard_full():
+		# D-46 strict no-wipe guard: the timer runs out but the animal is only "spooked & exhausted"
+		if farmer.carrying == a:
+			farmer.carrying = null
+		a.cure()
+		stats["spooked"] += 1
+		_resolve(a, "spooked_t")
+		return
 	if farmer.carrying == a:
 		farmer.carrying = null
 		a.position = farmer.position + Vector2(20, 0)
@@ -422,7 +440,7 @@ func on_enemy_killed(e: Node2D) -> void:
 		return
 	if e.get("is_raider") == true and e in zombies:
 		zombies.erase(e)
-		var bounty: int = 3 + raid_rival
+		var bounty: int = 4 + 2 * raid_rival
 		var back: int = int(e.stolen)
 		coins += bounty + back
 		raid_stats["beaten"] += 1
@@ -517,7 +535,7 @@ func begin_night() -> void:
 			seg_max[seg] = fence_max * 2.0
 	night_time = 0.0
 	plan_i = 0
-	chain_posts = CHAIN_POSTS_PER_NIGHT
+	chain_posts = mini(CHAIN_POSTS_PER_NIGHT, maxi(0, DEAD_STOCK_CAP - dead_stock))
 	herd_at_dusk = healthy_count()
 	raid_spawn_at = -1.0
 	raid_stats = {}
@@ -526,7 +544,7 @@ func begin_night() -> void:
 		pending_raid = -1
 		raid_spawn_at = 16.0
 		raid_stats = {"raiders": 0, "beaten": 0, "stolen": 0, "recovered": 0, "escaped": 0}
-	stats = {"bitten": 0, "turned": 0, "saved": 0, "cured": 0, "culled": 0, "chained": 0, "spooked": 0,
+	stats = {"bitten": 0, "turned": 0, "saved": 0, "cured": 0, "culled": 0, "chained": 0, "spooked": 0, "spooked_t": 0, "lost_strict": 0,
 		"kills": 0, "zombie_animals_killed": 0, "lat_sum": 0.0, "lat_n": 0, "near_miss": 0,
 		"fan_opens": 0, "fan_actions": 0, "auto_carry": 0, "left_sum": 0.0, "tense": 0}
 	popup(PEN_CENTER + Vector2(0, -200), "NIGHT %d: THEY WANT YOUR LIVESTOCK" % night, Color(1, 0.5, 0.4), 22)
@@ -556,6 +574,10 @@ func _end_night() -> void:
 	var lost_infected := 0
 	for a in animals.duplicate():
 		if a.state == AnimalScript.State.INFECTED or a.state == AnimalScript.State.CARRIED:
+			if STRICT_GUARD and _guard_full():
+				a.cure()   # still under the strict guard: spooked, not lost
+				continue
+			stats["lost_strict"] = int(stats.get("lost_strict", 0)) + 1
 			lost_infected += 1
 			animals.erase(a)
 			a.queue_free()
@@ -645,12 +667,12 @@ func _cost(item: String) -> int:
 	match item:
 		"repair": return 10
 		"vaccine": return 15
-		"fork": return 25 * fork_level
+		"fork": return 20 * fork_level
 		"fence": return 30 * fence_level
-		"chicken": return 10
-		"pig": return 20
-		"cow": return 35
-		"planks": return 10
+		"chicken": return 12
+		"pig": return 25
+		"cow": return 45
+		"planks": return 10 * (1 + bonus_planks / 3)
 		"train_chicken": return TRAIN_COST["chicken"]
 		"train_pig": return TRAIN_COST["pig"]
 		"train_cow": return TRAIN_COST["cow"]
@@ -685,6 +707,9 @@ func buy(item: String) -> void:
 			for i in SEGMENTS:
 				fence_hp[i] = fence_max
 		"chicken", "pig", "cow":
+			if animals.size() >= pen_cap():
+				popup(farmer.position + Vector2(0, -40), "the pen is full (upgrade fences)", Color(1, 0.6, 0.5))
+				return
 			_add_animal(item)
 		"planks":
 			bonus_planks += 3
@@ -1402,9 +1427,9 @@ func _refresh_ui() -> void:
 		"vaccine": "Vaccine dart (%d)" % vaccines,
 		"fork": "Pitchfork Lv %d (+stamina)" % fork_level,
 		"fence": "Fences Lv %d (+1 plank)" % fence_level,
-		"chicken": "Chicken +3",
-		"pig": "Pig +6",
-		"cow": "Cow +10",
+		"chicken": "Chicken +4",
+		"pig": "Pig +7",
+		"cow": "Cow +12",
 		"planks": "3 planks (%d stored)" % bonus_planks,
 		"train_chicken": "Train hen bomber",
 		"train_pig": "Train pig brawler",
@@ -1451,9 +1476,9 @@ func _make_plan() -> void:
 		avail.append("bloater")
 	var featured: String = avail[mini(night - 1, avail.size() - 1)]   # the newest type always shows up
 	var waves: int = 2 if night == 1 else (3 if night <= 3 else (4 if night <= 7 else 5))
-	var budget: float = 6.0 + 4.0 * night
+	var budget: float = 5.0 + 3.0 * night + 0.08 * night * night
 	var gap: float = maxf(9.0, 15.0 - night)
-	var cost := {"walker": 1.0, "brute": 3.0, "crow": 0.75, "bloater": 3.0}
+	var cost := {"walker": 1.0, "brute": 3.0, "crow": 1.0, "bloater": 3.0}
 	var last_side := -1
 	var t := 4.0
 	for w in waves:
@@ -1465,7 +1490,7 @@ func _make_plan() -> void:
 		var wb: float = budget / waves
 		if w == 1 or (waves == 2 and w == 0 and featured != "walker"):
 			if featured != "walker":
-				var n_f := 3 if featured == "crow" else 1
+				var n_f := 2 if featured == "crow" else 1
 				units[featured] = n_f
 				wb -= cost[featured] * n_f
 		elif w >= 2 and avail.size() > 1:
@@ -1685,6 +1710,14 @@ func _healthy_of(kind: String) -> Node2D:
 	return null
 
 
+func pen_cap() -> int:
+	return PEN_BASE + PEN_PER_FENCE * fence_level
+
+
+func spike_dps() -> float:
+	return SPIKE_DPS + SPIKE_DPS_PER_NIGHT * night
+
+
 func army_total() -> int:
 	return int(army["chicken"]) + int(army["pig"]) + int(army["cow"]) + dead_stock
 
@@ -1798,7 +1831,7 @@ func _close_overlay() -> void:
 func _spawn_raid_gang() -> void:
 	raid_spawn_at = -1.0
 	var r: Dictionary = RaidScript.RIVALS[raid_rival]
-	var n: int = mini(3 + raid_rival * 2, 9)
+	var n: int = 3 + raid_rival
 	var side := randi() % 4
 	var names := ["NORTH", "SOUTH", "WEST", "EAST"]
 	popup(PEN_CENTER + Vector2(0, -230), "%s'S GANG RAIDS FROM THE %s!" % [String(r["owner"]).to_upper(), names[side]], Color(1, 0.6, 0.3), 20)
@@ -1818,7 +1851,7 @@ func _spawn_raid_gang() -> void:
 
 
 func raider_steal(r: Node2D) -> int:
-	var amt: int = mini(int(coins * 0.12), 12 + 6 * raid_rival)
+	var amt: int = mini(int(coins * 0.15), 15 + 10 * raid_rival)
 	amt = max(amt, 0)
 	coins -= amt
 	raid_stats["stolen"] += amt

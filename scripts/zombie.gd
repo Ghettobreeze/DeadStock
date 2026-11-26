@@ -13,6 +13,7 @@ const TYPES := {
 	"bloater": {"hp": 1.4, "speed": 0.6, "chew": 0.5, "r": 16.0, "spike": 1.0},
 }
 const BURST_RADIUS := 75.0
+const HP_JITTER := 0.15   # +-15 % HP spread smooths the "now it takes 3 hits" cliffs
 
 var main: Node2D
 var ztype := "walker"
@@ -36,10 +37,10 @@ func setup(m: Node2D, night: int, type := "walker") -> void:
 	main = m
 	ztype = type
 	var d: Dictionary = TYPES[ztype]
-	max_hp = (50.0 + 12.0 * (night - 1)) * float(d["hp"])
+	max_hp = (45.0 + 7.0 * (night - 1)) * float(d["hp"]) * randf_range(1.0 - HP_JITTER, 1.0 + HP_JITTER)
 	hp = max_hp
-	speed = (randf_range(38.0, 52.0) + 3.0 * night) * float(d["speed"])
-	chew_dps = (12.0 + 4.0 * night) * float(d["chew"])
+	speed = (randf_range(38.0, 52.0) + 2.0 * night) * float(d["speed"])
+	chew_dps = (9.0 + 2.0 * night) * float(d["chew"])
 	radius = d["r"]
 	spike_mult = d["spike"]
 	t = randf() * 10.0
@@ -76,7 +77,7 @@ func tick(delta: float) -> void:
 				chewing = true
 				main.damage_fence(seg, chew_dps * delta)
 				if main.pieces.get(seg, "") == "spikes" and spike_mult > 0.0:
-					take_damage(main.SPIKE_DPS * spike_mult * delta)
+					take_damage(main.spike_dps() * spike_mult * delta)
 					if hp <= 0.0:
 						main.on_enemy_killed(self)
 						return
@@ -119,7 +120,7 @@ func _crow_tick(delta: float) -> void:
 	position = position.move_toward(target.position, speed * delta)
 	if bite_cd <= 0.0 and position.distance_to(target.position) < radius + target.radius + 2.0:
 		main.bite(target, self)
-		bite_cd = 2.2
+		bite_cd = 4.0   # D-52: peck, then circle 4 s
 
 
 func _draw() -> void:

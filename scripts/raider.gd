@@ -22,7 +22,7 @@ var goat := true
 
 func setup(m: Node2D, night: int, tier: int, color: Color) -> void:
 	main = m
-	max_hp = 60.0 + 10.0 * night + 25.0 * tier
+	max_hp = 40.0 + 6.0 * night + 20.0 * tier
 	hp = max_hp
 	speed = randf_range(62.0, 78.0)
 	chew_dps = 26.0 + 8.0 * tier
