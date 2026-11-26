@@ -2592,19 +2592,34 @@ func _build_ui_v2() -> void:
 	# ---- farm store v2: 2 columns, 92 px (46 dp) rows, short benefit line, progressive unlocks
 	shop_panel.queue_free()
 	shop_buttons.clear()
-	shop_panel = _panel(Vector2(16, screen.y - 600), Vector2(screen.x - 32, 0))
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	shop_panel.add_child(v)
+	# fixed-size panel: the item list scrolls, START NIGHT is pinned at the bottom so it can never
+	# be pushed off-screen as more items unlock (phone bug: day 2 couldn't be started)
+	var store_top: float = screen.y * 0.36
+	var store_h: float = screen.y - store_top - 150.0
+	shop_panel = _panel(Vector2(16, store_top), Vector2(screen.x - 32, store_h))
+	shop_panel.custom_minimum_size = Vector2(screen.x - 32, store_h)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 8)
+	shop_panel.add_child(outer)
 	var head := Label.new()
 	head.text = "FARM STORE: get ready for tonight"
 	head.add_theme_font_size_override("font_size", 26)
 	head.add_theme_color_override("font_color", Color(1, 0.85, 0.4))
-	v.add_child(head)
+	outer.add_child(head)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	outer.add_child(scroll)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(v)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(grid)
 	for item in ["vaccine", "planks", "repair", "chicken", "fork", "fence", "pig", "cow", "train_chicken", "train_pig", "train_cow"]:
 		var btn := _big_button("", 96, 21)
@@ -2623,11 +2638,11 @@ func _build_ui_v2() -> void:
 	goal_label = Label.new()
 	goal_label.add_theme_font_size_override("font_size", 22)
 	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	goal_label.custom_minimum_size = Vector2(screen.x - 70, 0)
+	goal_label.custom_minimum_size = Vector2(screen.x - 90, 0)
 	v.add_child(goal_label)
 	var start := _big_button("START NIGHT  >", 110, 34, Color(0.24, 0.6, 0.25))
 	start.pressed.connect(start_night)
-	v.add_child(start)
+	outer.add_child(start)
 	# ---- dusk panel v2
 	dusk_panel.queue_free()
 	piece_buttons.clear()
