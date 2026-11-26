@@ -17,6 +17,7 @@ enum Mode { PREP, NIGHT, RESULT }
 signal exited(best: Dictionary)
 var embedded := false        # opened from the farm (main.gd) as a minigame overlay
 var best := {}               # level index -> best stars this session (and earlier, passed in)
+var peeked := {}             # level index -> true once "Peek" showed the solution (no stars recorded after that)
 
 var levels: Array = []
 var li := 0
@@ -331,6 +332,7 @@ func _start_night() -> void:
 func _peek() -> void:
 	## "Blueprint Peek" (01 sec 3.2 C): load the developer's solution
 	var sol: Dictionary = levels[li]["solution"]
+	peeked[li] = true
 	placement = {"farmer": sol.get("farmer", "c"), "pieces": sol["pieces"].duplicate(true)}
 	_restart_prep()
 
@@ -363,9 +365,12 @@ func _process(delta: float) -> void:
 func _show_result() -> void:
 	var r := sim.result
 	var lv: Dictionary = levels[li]
-	best[li] = max(int(best.get(li, 0)), int(r["stars"]))
+	if not peeked.get(li, false):
+		best[li] = max(int(best.get(li, 0)), int(r["stars"]))
 	var stars := "*".repeat(r["stars"]) + "-".repeat(3 - r["stars"])
 	var head := "SUNRISE!" if r["stars"] > 0 else "The herd got snacked on."
+	if peeked.get(li, false):
+		head += " (peeked: no stars recorded)"
 	result_label.text = "%s   [%s]\nKept %d / %d   Planks %d / %d\n1* keep %d   2* keep all   3* %s\n%s" % [
 		head, stars, r["kept"], r["kept"] + r["lost"], r["spent"], lv["budget"], lv["min_keep"],
 		lv["three_star"]["text"], lv.get("outro", "")]

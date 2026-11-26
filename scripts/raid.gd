@@ -66,6 +66,7 @@ var unit_buttons := {}
 var result_panel: PanelContainer
 var result_label: Label
 var result: Dictionary = {}
+var result_sent := false
 
 
 func setup(idx: int, the_army: Dictionary, the_week: int) -> void:
@@ -92,8 +93,12 @@ func _build_farm() -> void:
 	for i in SEG:
 		fence_hp.append(fence_max)
 	var gaps: int = int(rival["gaps"])
-	for g in gaps:
-		fence_hp[rng.randi_range(0, SEG - 1)] = 0.0
+	var opened := 0
+	while opened < mini(gaps, SEG):   # distinct sections, so a rival always has the gaps it advertises
+		var sg := rng.randi_range(0, SEG - 1)
+		if fence_hp[sg] > 0.0:
+			fence_hp[sg] = 0.0
+			opened += 1
 	var spin := rng.randf_range(-25.0, 25.0)
 	for b in rival["buildings"]:
 		var ang := deg_to_rad(float(b[1]) + spin + rng.randf_range(-12.0, 12.0))
@@ -366,7 +371,7 @@ func _finish() -> void:
 	for u in units:
 		if u["alive"]:
 			survivors[u["kind"]] += 1
-	result = {"rival": rival_idx, "stars": stars, "pct": pct, "loot": loot_got + bonus, "survivors": survivors, "lost": lost.duplicate()}
+	result = {"rival": rival_idx, "stars": stars, "pct": pct, "loot": loot_got + bonus, "survivors": survivors, "lost": lost.duplicate(), "deployed": units.size()}
 	var lost_txt: Array = []
 	for k in UNIT_ORDER:
 		if lost[k] > 0:
@@ -378,6 +383,9 @@ func _finish() -> void:
 
 
 func _back() -> void:
+	if result_sent or not done:
+		return
+	result_sent = true
 	finished.emit(result)
 
 
