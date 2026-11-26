@@ -112,6 +112,13 @@ func tick(delta: float) -> void:
 			_zombie_tick(delta)
 		State.SAFE:
 			visible = false
+			if main.is_night():
+				contact_time += delta
+				if contact_time >= main.barn_release:
+					contact_time = 0.0
+					cure()
+					visible = true
+					position = main.barn_rect.get_center() + Vector2(randf_range(-30, 30), 50)
 	queue_redraw()
 
 
@@ -164,7 +171,10 @@ func _draw() -> void:
 	var font := ThemeDB.fallback_font
 	if state == State.INFECTED or state == State.CARRIED:
 		draw_arc(Vector2.ZERO, radius + 6, -PI / 2, -PI / 2 + TAU * (infect_time / infect_total), 24, Color(0.75, 0.3, 1.0), 3.0)
-		draw_string(font, Vector2(-6, -radius - 10), str(ceil(infect_time)), HORIZONTAL_ALIGNMENT_CENTER, -1, 14, Color(1, 0.85, 1))
+		var cfs := 20 if main.ux2 else 14
+		if main.ux2:
+			draw_string_outline(font, Vector2(-7, -radius - 12), str(ceil(infect_time)), HORIZONTAL_ALIGNMENT_LEFT, -1, cfs, 4, Color(0.15, 0, 0.2))
+		draw_string(font, Vector2(-6, -radius - 10), str(ceil(infect_time)), HORIZONTAL_ALIGNMENT_CENTER, -1, cfs, Color(1, 0.85, 1))
 	if state == State.ZOMBIE:
 		var w := radius * 2.2
 		draw_rect(Rect2(-w / 2, -radius - 9, w, 4), Color(0, 0, 0, 0.5))

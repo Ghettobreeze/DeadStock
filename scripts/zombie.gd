@@ -31,6 +31,7 @@ var flash := 0.0
 var chewing := false
 var hat := 0
 var dead := false
+var slide_dir := 1.0          # which way to shuffle along the fence when a section is crowded
 
 
 func setup(m: Node2D, night: int, type := "walker") -> void:
@@ -46,6 +47,7 @@ func setup(m: Node2D, night: int, type := "walker") -> void:
 	t = randf() * 10.0
 	hat = randi() % 4
 	inside = ztype == "crow"   # crows ignore fences
+	slide_dir = 1.0 if randf() < 0.5 else -1.0
 	aim = main.decoy_point_for(position, ztype)
 
 
@@ -73,7 +75,10 @@ func tick(delta: float) -> void:
 		var to_center: Vector2 = main.pen_center - position
 		if to_center.length() <= main.pen_radius + 8.0:
 			var seg: int = main.segment_at(position)
-			if main.fence_hp[seg] > 0.0:
+			if main.fence_hp[seg] > 0.0 and not main.claim_chew(seg):
+				# section is crowded: shuffle along the fence toward a neighbour
+				position = main.pen_center + (position - main.pen_center).rotated(slide_dir * 0.5 * delta)
+			elif main.fence_hp[seg] > 0.0:
 				chewing = true
 				main.damage_fence(seg, chew_dps * delta)
 				if main.pieces.get(seg, "") == "spikes" and spike_mult > 0.0:
