@@ -6,6 +6,7 @@ config_version=5
 config/name="Dead Stock (Prototype)"
 config/description="Zombies are coming for the livestock. Save, cure, cull or chain. Raid rival farms. Fix fences."
 run/main_scene="res://main.tscn"
+run/max_fps=60
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
@@ -17,6 +18,7 @@ window/size/window_height_override=768
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 window/handheld/orientation=1
+window/dpi/allow_hidpi=false
 
 [input_devices]
 
