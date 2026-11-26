@@ -47,6 +47,7 @@ var overlay: Node = null          # a raid or Fence Fixer currently open on top 
 var army := {"chicken": 0, "pig": 0, "cow": 0}
 var ribbons := 0
 var rival_best := {}
+var raid_counts := {}            # "rival:week" -> raids this week (repeat loot decay)
 var rival_week := {}              # rival index -> week() in which we last flattened it (1+ star); it rebuilds next week
 var raids_today := 0
 var pending_raid := -1            # rival index whose gang raids us on the coming night
@@ -267,6 +268,7 @@ func _new_game() -> void:
 	ribbons = 0
 	rival_best = {}
 	rival_week = {}
+	raid_counts = {}
 	raids_today = 0
 	pending_raid = -1
 	raid_spawn_at = -1.0
@@ -1765,6 +1767,11 @@ func _on_raid_finished(res: Dictionary) -> void:
 	if overlay == null:
 		return
 	var i: int = int(res["rival"])
+	# rivals rebuild weekly; a farm you already hit this week has less left to take
+	var key := "%d:%d" % [i, week()]
+	var k: int = int(raid_counts.get(key, 0))
+	res["loot"] = int(round(float(res["loot"]) * pow(LOOT_REPEAT, k)))
+	raid_counts[key] = k + 1
 	coins += int(res["loot"])
 	ribbons += int(res["stars"]) * 10
 	var sv: Dictionary = res["survivors"]
