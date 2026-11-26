@@ -28,13 +28,19 @@ const ACTION_RANGE := 48.0
 const FAN_RANGE := 70.0          # thumb-lift search radius (world px) for the Action Fan
 const TIMER_STEPS := [6.0, 8.0, 12.0, 16.0, 20.0]
 const NO_WIPE_SHARE := 0.35      # 02_combat: at most 35 % of the herd can turn per night
+const STRICT_GUARD := true       # D-46: timers that expire after the guard is full only spook
 const CHAIN_POSTS_PER_NIGHT := 2
-const BARN_SLOTS := 4             # 02_combat: barn slots = 2 + barn tier (tier 2 here)
+var BARN_SLOTS := 3             # 02_combat: barn slots = 2 + barn tier (tier 2 here)
 
 enum Phase { DAY, DUSK, NIGHT, DAWN, GAME_OVER }
 
 # exposed as vars so the entity scripts can read them through `main`
 var pen_center := PEN_CENTER
+var barn_release := BARN_RELEASE
+var CHEWERS_PER_SECTION := 2   # only 2 zombies chew a section at once; the rest queue (SLIDE_RATE 0)
+var FENCE_PER_NIGHT := 25.0    # fences are dug in a bit deeper each night (bonus HP, gone at dawn)
+var chew_claims := {}
+var horde_scale := 1.0
 var barn_rect := BARN_RECT
 
 # ---- release-1 simulated PvP (rival farms + random rival raids) and minigames
@@ -46,6 +52,8 @@ var overlay: Node = null          # a raid or Fence Fixer currently open on top 
 var army := {"chicken": 0, "pig": 0, "cow": 0}
 var ribbons := 0
 var rival_best := {}
+var raid_counts := {}            # "rival:week" -> raids this week (repeat loot decay)
+var rival_week := {}              # rival index -> week() in which we last flattened it (1+ star); it rebuilds next week
 var raids_today := 0
 var pending_raid := -1            # rival index whose gang raids us on the coming night
 var raid_rival := -1
@@ -60,7 +68,12 @@ var rival_buttons: Array = []
 var at := {}                      # autotest flags
 
 # ---- dusk planning: read the forecast, spend planks on fence sections
-const SPIKE_DPS := 26.0
+var SPIKE_DPS := 30.0          # + SPIKE_DPS_PER_NIGHT x night (spikes keep pace with zombie HP)
+var SPIKE_DPS_PER_NIGHT := 7.0
+const PEN_BASE := 8               # pen holds PEN_BASE + PEN_PER_FENCE x fence level animals
+const PEN_PER_FENCE := 2
+const DEAD_STOCK_CAP := 6
+const LOOT_REPEAT := 0.5         # each repeat raid on the same rival in the same week pays x0.5
 const PIECE_COST := {"barricade": 1, "spikes": 2, "scarecrow": 2}
 const PIECE_INFO := {
 	"barricade": "Barricade (1 plank): that fence section is twice as strong tonight",
@@ -68,7 +81,9 @@ const PIECE_INFO := {
 	"scarecrow": "Scarecrow (2): crows go for it first, and nearby hordes head for its section",
 }
 const SIDE_NAMES := ["NORTH", "SOUTH", "WEST", "EAST"]
-const SIDE_DIRS := [Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0)]
+const LANE_SHIFT := PI / 12.0     # lanes aim at the MIDDLE of one fence section (12 sections), not the seam between two
+var SIDE_DIRS := [Vector2(0, -1).rotated(LANE_SHIFT), Vector2(0, 1).rotated(LANE_SHIFT), Vector2(-1, 0).rotated(LANE_SHIFT), Vector2(1, 0).rotated(LANE_SHIFT)]
+const BARN_RELEASE := 15.0       # saved animals are cured in the barn and walk back out after this (no panic room)
 const TYPE_TIPS := {
 	"walker": "Walkers: chew a fence section, then go for the herd.",
 	"brute": "BRUTE: chews fences 3x faster, takes 3x the hits. Spikes only do half. Barricade its side.",
@@ -77,6 +92,7 @@ const TYPE_TIPS := {
 }
 var pieces := {}                  # segment -> piece name (tonight only)
 var scarecrow_hp := {}
+var barricade_base := {}          # segment -> fence hp before tonight's barricade
 var seg_max: Array[float] = []
 var plan: Array = []              # [{t, side, units:{type:n}}] sorted by t
 var plan_i := 0
@@ -93,6 +109,29 @@ var farmer_min := Vector2(20, 70)
 var farmer_max := Vector2(1260, 700)
 
 var portrait := true
+# ---- UX eval v2 (eval copy only): bigger type, contextual copy, forecast card, slots, banner tips
+var ux2 := true   # new-player UI (eval round): bigger text/buttons, dusk slots, banners, tips
+var banner_panel: PanelContainer
+var banner_label: Label
+var banner_t := 0.0
+var keys_label: Label
+var goal_label: Label
+var auto_btn: Button
+var shown_tips := {}
+const TIPS_V2 := {
+	"walker": "WALKERS chew through a fence section, then go for your animals.\nCounter: SPIKES or a BARRICADE on that section.",
+	"brute": "NEW: BRUTE. Big, slow, chews fences 3x faster and takes 3 fork hits.\nCounter: BARRICADE its section. Spikes only do half.",
+	"crow": "NEW: CROWS. They fly OVER fences straight at your animals.\nCounter: a SCARECROW. Crows peck it first.",
+	"bloater": "NEW: BLOATER. It pops when it dies or touches an animal and bites everything in its purple ring.\nCounter: kill it OUTSIDE the fence. Never let it reach the herd.",
+	"stamina": "OUT OF BREATH! Each fork swing costs stamina (blue bar). Let it refill, or fight one side at a time.",
+	"bitten": "BITTEN! It turns in 8 seconds. Walk into it to pick it up, then carry it into the BARN glow.",
+	"raid": "RIVAL RAIDERS! They don't bite. They smash a fence, run for the barn and steal coins. Bonk them for a bounty.",
+}
+const PIECE_V2 := {
+	"barricade": ["BARRICADE  1", "Fence 2x tough"],
+	"spikes": ["SPIKES  2", "Hurts chewers"],
+	"scarecrow": ["SCARECROW  2", "Lures crows + hordes"],
+}
 var screen := Vector2(720, 1280)
 var cam: Camera2D
 
@@ -155,6 +194,8 @@ var dawn_panel: PanelContainer
 var dawn_label: Label
 var over_panel: PanelContainer
 var over_label: Label
+var panel_opened_ms := -100000     # when the shop / dusk panel last appeared (ghost double-tap guard)
+const GHOST_TAP_MS := 350
 
 # autotest / sweep
 var autotest_dir := ""
@@ -173,6 +214,26 @@ var sweep_acc := {}
 var session_log := []
 var sweep_start_night := 1
 var sweep_herd := 6
+var eval_seed := 1000
+var bot_planner := "auto"   # sweep: auto (shipped) | none | random | spikes_lane | barricade | funnel | smart
+var bot_triage := "human"   # sweep: human (react ~2 s, one thing at a time) | perfect | none
+var bot_fight := "chase"    # sweep: chase | idle | guard
+var bot_shop := "campaign"     # sweep: basic | campaign
+var bot_busy_until := 0.0
+var SCARECROW_HP := 120.0
+var SLIDE_RATE := 0.0      # rad/s a crowded zombie shuffles along the fence (0 = waits its turn)
+var STAMINA_REGEN := 1.25  # pitchfork swings recovered per second
+var BURST_RADIUS := 75.0   # bloater burst radius
+var AUTO_CARRY_T := 1.0   # contact time before an auto-carry pick-up (was 0.25: saves happened by accident)
+var CHEW_BASE := 9.0
+var CHEW_PER_NIGHT := 1.0
+var NIGHT_TAIL := 16.0     # seconds of night after the last wave lands
+var PLANKS_BASE := 2
+var PLANKS_PER_LANE := 1.5
+var carry_mult := 0.45       # farmer speed while carrying (was 0.8: the barn is 1 s from anywhere)
+var bot_notice := {}
+var bot_stick := 0.85       # humans rarely hold the virtual stick at full deflection
+var sweep_noplan := false  # bot that triages well but skips dusk planning (tests whether the plan matters)
 var sweep_lazy := false   # bot that skips dusk planning and just chases zombies (the "drag and auto-fight" player)
 
 const TURN_LINES := {
@@ -191,6 +252,21 @@ func _ready() -> void:
 		if a.begins_with("--autotest="):
 			autotest_dir = a.trim_prefix("--autotest=")
 			Engine.time_scale = 3.0
+		elif a.begins_with("--uxtour="):
+			var tour = load("res://scripts/ux_tour.gd").new()
+			tour.m = self
+			tour.dir = a.trim_prefix("--uxtour=")
+			for a2 in OS.get_cmdline_user_args():
+				if a2.begins_with("--uxtag="):
+					tour.tag = a2.trim_prefix("--uxtag=")
+			call_deferred("add_child", tour)
+		elif a.begins_with("--uxpassive="):
+			var pt = load("res://scripts/ux_passive.gd").new()
+			pt.m = self
+			pt.runs = int(a.trim_prefix("--uxpassive="))
+			call_deferred("add_child", pt)
+		elif a == "--uxv2":
+			ux2 = true
 		elif a == "--landscape":
 			portrait = false
 		elif a.begins_with("--turn="):
@@ -208,6 +284,24 @@ func _ready() -> void:
 			sweep_herd = int(a.trim_prefix("--herd="))
 		elif a == "--lazy":
 			sweep_lazy = true
+		elif a.begins_with("--horde="):
+			horde_scale = float(a.trim_prefix("--horde="))
+		elif a == "--noplan":
+			sweep_noplan = true
+		elif a.begins_with("--planner="):
+			bot_planner = a.trim_prefix("--planner=")
+		elif a.begins_with("--triage="):
+			bot_triage = a.trim_prefix("--triage=")
+		elif a.begins_with("--fight="):
+			bot_fight = a.trim_prefix("--fight=")
+		elif a.begins_with("--shop="):
+			bot_shop = a.trim_prefix("--shop=")
+		elif a.begins_with("--seed="):
+			eval_seed = int(a.trim_prefix("--seed="))
+		elif a.begins_with("--set="):
+			# --set=name=value : override any numeric tuning var on main (eval sweeps)
+			var kv := a.trim_prefix("--set=").split("=")
+			set(kv[0], float(kv[1]) if typeof(get(kv[0])) == TYPE_FLOAT else int(kv[1]))
 		elif a.begins_with("--react="):
 			bot_react = float(a.trim_prefix("--react="))
 	_setup_view()
@@ -222,7 +316,11 @@ func _ready() -> void:
 	_build_ui()
 	if not sweep_values.is_empty():
 		turn_timer = sweep_values[0]
-		seed(1000)
+		seed(eval_seed)
+		if sweep_noplan:
+			bot_planner = "none"
+		if sweep_lazy:
+			bot_triage = "lazy"
 	_new_game()
 
 
@@ -256,6 +354,8 @@ func _new_game() -> void:
 	army = {"chicken": 0, "pig": 0, "cow": 0}
 	ribbons = 0
 	rival_best = {}
+	rival_week = {}
+	raid_counts = {}
 	raids_today = 0
 	pending_raid = -1
 	raid_spawn_at = -1.0
@@ -272,6 +372,15 @@ func _new_game() -> void:
 	bonus_planks = 0
 	seen_types = {}
 	pieces.clear()
+	scarecrow_hp.clear()
+	plan.clear()
+	plan_i = 0
+	raid_rival = -1
+	raid_stats = {}
+	night_time = 0.0
+	for f in fx_layer.get_children():
+		f.queue_free()
+	_reset_touch()
 	var kinds := ["chicken", "chicken", "chicken", "pig", "pig", "cow"]
 	var herd_n := 6 if sweep_values.is_empty() else sweep_herd
 	for i in herd_n:
@@ -305,6 +414,15 @@ func random_point_in_pen() -> Vector2:
 		if not BARN_RECT.grow(14).has_point(p):
 			return p
 	return PEN_CENTER + Vector2(0, 120)
+
+
+func claim_chew(seg: int) -> bool:
+	## each fence section holds at most CHEWERS_PER_SECTION chewing zombies per frame
+	var n: int = int(chew_claims.get(seg, 0))
+	if n >= CHEWERS_PER_SECTION:
+		return false
+	chew_claims[seg] = n + 1
+	return true
 
 
 func segment_at(pos: Vector2) -> int:
@@ -349,17 +467,31 @@ func nearest_enemy(pos: Vector2, max_dist: float) -> Node2D:
 	return best
 
 
-func bite(target: Node2D, _by: Node2D) -> void:
+func _turn_cap() -> int:
+	## at most 35 % of the dusk herd may turn tonight (rounded down, at least 1)
+	return maxi(1, int(floor(NO_WIPE_SHARE * herd_at_dusk)))
+
+
+func bite(target: Node2D, _by: Node2D) -> bool:
 	if not target.is_bitable():
-		return
+		return false
 	# no-wipe guard: once 35 % of the dusk herd has turned, bites only spook (02_combat sec 2.5)
-	if stats["turned"] >= int(ceil(NO_WIPE_SHARE * herd_at_dusk)):
+	if stats["turned"] >= _turn_cap() or (night <= 3 and healthy_count() <= 2):
 		stats["spooked"] += 1
 		popup(target.position + Vector2(0, -24), "spooked!", Color(0.9, 0.9, 0.6))
-		return
+		return false
 	target.infect()
 	stats["bitten"] += 1
+	stats["last_bite_t"] = night_time
+	if not stats.has("first_bite_t"):
+		stats["first_bite_t"] = night_time
+	if _by != null and _by.get("ztype") == "crow":
+		stats["crow_bites"] = int(stats.get("crow_bites", 0)) + 1
+	if _by != null and _by.get("ztype") == "bloater":
+		stats["bloater_bites"] = int(stats.get("bloater_bites", 0)) + 1
+	show_banner("bitten", 5.0)
 	popup(target.position + Vector2(0, -24), "BITTEN!", Color(0.85, 0.5, 1.0))
+	return true
 
 
 func _resolve(a: Node2D, method: String) -> void:
@@ -376,12 +508,33 @@ func _resolve(a: Node2D, method: String) -> void:
 	stats[method] += 1
 
 
+func _guard_full() -> bool:
+	return stats["turned"] + int(stats.get("lost_strict", 0)) >= int(ceil(NO_WIPE_SHARE * herd_at_dusk))
+
+
 func on_animal_turned(a: Node2D) -> void:
+	if STRICT_GUARD and _guard_full():
+		# D-46 strict no-wipe guard: the timer runs out but the animal is only "spooked & exhausted"
+		if farmer.carrying == a:
+			farmer.carrying = null
+		a.cure()
+		a.set_meta("no_pay", true)   # too shaken to lay / milk tomorrow
+		stats["spooked"] += 1
+		_resolve(a, "spooked_t")
+		return
 	if farmer.carrying == a:
 		farmer.carrying = null
 		a.position = farmer.position + Vector2(20, 0)
 	if fan_target == a:
 		_close_fan(false)
+	# no-wipe guard, enforced when the timer runs out: several animals bitten at once (bloater burst)
+	# must not push the night past the cap
+	if stats["turned"] >= _turn_cap():
+		stats["spooked"] += 1
+		a.cure()
+		a.set_meta("no_pay", true)   # too shaken to lay / milk tomorrow
+		popup(a.position + Vector2(0, -30), "shook it off! (no produce tomorrow)", Color(0.9, 0.9, 0.6), 18)
+		return
 	_resolve(a, "turned")
 	a.turn()
 	var lines: Array = TURN_LINES[a.kind]
@@ -395,7 +548,7 @@ func on_enemy_killed(e: Node2D) -> void:
 		return
 	if e.get("is_raider") == true and e in zombies:
 		zombies.erase(e)
-		var bounty: int = 3 + raid_rival
+		var bounty: int = 4 + 2 * raid_rival
 		var back: int = int(e.stolen)
 		coins += bounty + back
 		raid_stats["beaten"] += 1
@@ -406,6 +559,7 @@ func on_enemy_killed(e: Node2D) -> void:
 	if e in zombies:
 		zombies.erase(e)
 		stats["kills"] += 1
+		stats["last_kill_t"] = night_time
 		e.queue_free()
 	elif e in animals:
 		animals.erase(e)
@@ -419,6 +573,11 @@ func popup(pos: Vector2, text: String, color := Color.WHITE, size := 16) -> void
 	if not sweep_values.is_empty():
 		return
 	var f: Node2D = FloatText.new()
+	if ux2:
+		size = int(size * 1.3)
+		var w := ThemeDB.fallback_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var half_w := screen.x / cam.zoom.x / 2.0
+		pos.x = clampf(pos.x, cam.position.x - half_w + w / 2 + 6, cam.position.x + half_w - w / 2 - 6)
 	f.text = text
 	f.color = color
 	f.size = size
@@ -436,8 +595,14 @@ func healthy_count() -> int:
 
 # ---------------------------------------------------------------- phases
 
+func _fresh_panel() -> bool:
+	## true for a moment after a panel appears under the player's finger: ignore that tap
+	return Time.get_ticks_msec() - panel_opened_ms < GHOST_TAP_MS
+
+
 func _enter_day() -> void:
 	phase = Phase.DAY
+	panel_opened_ms = Time.get_ticks_msec()
 	raids_today = 0
 	if county_panel:
 		county_panel.visible = false
@@ -455,7 +620,7 @@ func start_night() -> void:
 	_make_plan()
 	pieces.clear()
 	scarecrow_hp.clear()
-	planks = 3 + fence_level + bonus_planks
+	planks = PLANKS_BASE + fence_level + bonus_planks + int(PLANKS_PER_LANE * plan.size())
 	bonus_planks = 0
 	phase = Phase.DUSK
 	shop_panel.visible = false
@@ -463,10 +628,12 @@ func start_night() -> void:
 		county_panel.visible = false
 	if not sweep_values.is_empty():
 		if not sweep_lazy:
-			_auto_plan()
+			_eval_plan()
 		begin_night()
 		return
 	dusk_panel.visible = true
+	panel_opened_ms = Time.get_ticks_msec()
+	_dusk_camera(true)
 	_refresh_dusk()
 
 
@@ -475,13 +642,21 @@ func begin_night() -> void:
 		return
 	phase = Phase.NIGHT
 	dusk_panel.visible = false
+	barricade_base.clear()
+	_dusk_camera(false)
+	var dig_in := FENCE_PER_NIGHT * (night - 1)
+	for i in SEGMENTS:
+		if fence_hp[i] > 0.0:
+			fence_hp[i] += dig_in
+			seg_max[i] += dig_in
 	for seg in pieces:
 		if pieces[seg] == "barricade":
+			barricade_base[seg] = fence_hp[seg]   # the barricade soaks damage first and is gone at dawn
 			fence_hp[seg] += fence_max
 			seg_max[seg] = fence_max * 2.0
 	night_time = 0.0
 	plan_i = 0
-	chain_posts = CHAIN_POSTS_PER_NIGHT
+	chain_posts = mini(CHAIN_POSTS_PER_NIGHT, maxi(0, DEAD_STOCK_CAP - dead_stock))
 	herd_at_dusk = healthy_count()
 	raid_spawn_at = -1.0
 	raid_stats = {}
@@ -490,9 +665,10 @@ func begin_night() -> void:
 		pending_raid = -1
 		raid_spawn_at = 16.0
 		raid_stats = {"raiders": 0, "beaten": 0, "stolen": 0, "recovered": 0, "escaped": 0}
-	stats = {"bitten": 0, "turned": 0, "saved": 0, "cured": 0, "culled": 0, "chained": 0, "spooked": 0,
+	stats = {"bitten": 0, "turned": 0, "saved": 0, "cured": 0, "culled": 0, "chained": 0, "spooked": 0, "spooked_t": 0, "lost_strict": 0,
 		"kills": 0, "zombie_animals_killed": 0, "lat_sum": 0.0, "lat_n": 0, "near_miss": 0,
-		"fan_opens": 0, "fan_actions": 0, "auto_carry": 0, "left_sum": 0.0, "tense": 0}
+		"fan_opens": 0, "fan_actions": 0, "auto_carry": 0, "left_sum": 0.0, "tense": 0,
+		"spike_kills": 0, "breaches": 0, "fork_kills": 0, "crow_bites": 0, "bloater_bites": 0, "plan_pieces": pieces.values()}
 	popup(PEN_CENTER + Vector2(0, -200), "NIGHT %d: THEY WANT YOUR LIVESTOCK" % night, Color(1, 0.5, 0.4), 22)
 	_refresh_ui()
 
@@ -501,6 +677,9 @@ func _end_night() -> void:
 	phase = Phase.DAWN
 	pieces.clear()
 	scarecrow_hp.clear()
+	for seg in barricade_base:
+		fence_hp[seg] = minf(fence_hp[seg], float(barricade_base[seg]))   # no free repair from a barricade
+	barricade_base.clear()
 	for i in SEGMENTS:
 		fence_hp[i] = minf(fence_hp[i], fence_max)
 	_reset_seg_max()
@@ -508,16 +687,23 @@ func _end_night() -> void:
 	_close_fan(false)
 	touch_dir = Vector2.ZERO
 	joy_index = -1
+	stats["zombies_left"] = zombies.size()
 	for z in zombies:
+		if z.get("is_raider") == true and not raid_stats.is_empty():
+			raid_stats["escaped"] += 1   # still on the farm at sunrise = got away with what they stole
 		z.queue_free()
 	zombies.clear()
 	var burned := 0
 	var lost_infected := 0
 	for a in animals.duplicate():
 		if a.state == AnimalScript.State.INFECTED or a.state == AnimalScript.State.CARRIED:
+			if STRICT_GUARD and _guard_full():
+				a.cure()   # still under the strict guard: spooked, not lost
+				continue
+			stats["lost_strict"] = int(stats.get("lost_strict", 0)) + 1
 			lost_infected += 1
-			animals.erase(a)
-			a.queue_free()
+			a.cure()   # the sun cures them, but a sick animal pays nothing this morning
+			a.set_meta("no_pay", true)
 		elif a.is_enemy():
 			burned += 1
 			animals.erase(a)
@@ -530,6 +716,9 @@ func _end_night() -> void:
 	parts += burned
 	var produce := 0
 	for a in animals:
+		if a.has_meta("no_pay"):
+			a.remove_meta("no_pay")
+			continue
 		produce += a.payout()
 	var bonus: int = 5 + int(stats["kills"])
 	var total: int = produce + bonus
@@ -544,7 +733,7 @@ func _end_night() -> void:
 	if animals.is_empty():
 		_game_over()
 		return
-	var txt := "Night %d survived.   (turn timer %ds)\n\n" % [night, int(turn_timer)]
+	var txt := "Night %d survived.\n\n" % night
 	txt += "Bitten %d  Saved %d  Cured %d  Sent upstate %d  Chained %d  Turned %d\n" % [stats["bitten"], stats["saved"], stats["cured"], stats["culled"], stats["chained"], stats["turned"]]
 	txt += "Avg bite -> action: %.1fs   Buzzer-beaters (<1s left): %d\n" % [rec["avg_latency_s"], stats["near_miss"]]
 	txt += "Action Fan opened %d, used %d   Auto-carries %d\n" % [stats["fan_opens"], stats["fan_actions"], stats["auto_carry"]]
@@ -556,6 +745,8 @@ func _end_night() -> void:
 		txt += "%d zombie animal(s) tucked in by the sun (+%d grody bits).\n" % [burned, burned]
 	txt += "\nProduce from %d animals: +%d   Survival bonus: +%d   Total: +%d coins\nDead Stock army: %d" % [animals.size(), produce, bonus, total, dead_stock]
 	txt += extra_txt
+	if ux2:
+		txt = _dawn_text_v2(rec, produce, bonus, total, lost_infected, burned, extra_txt)
 	dawn_label.text = txt
 	dawn_panel.visible = true
 	night += 1
@@ -575,6 +766,10 @@ func _telemetry_record(lost_infected: int) -> Dictionary:
 		"tense": stats["tense"],
 		"fan_opens": stats["fan_opens"], "fan_actions": stats["fan_actions"], "auto_carry": stats["auto_carry"],
 		"portrait": portrait,
+		"spike_kills": stats.get("spike_kills", 0), "breaches": stats.get("breaches", 0), "kills": stats["kills"],
+		"fork_kills": stats.get("fork_kills", 0), "crow_bites": stats.get("crow_bites", 0), "bloater_bites": stats.get("bloater_bites", 0),
+		"last_bite_t": stats.get("last_bite_t", -1.0), "first_bite_t": stats.get("first_bite_t", -1.0), "night_end_t": night_time, "last_kill_t": stats.get("last_kill_t", -1.0), "zombies_left": stats.get("zombies_left", 0),
+		"pieces": stats.get("plan_pieces", []), "planner": bot_planner, "coins": coins, "to_spawn_total": _plan_total(),
 	}
 
 
@@ -582,9 +777,21 @@ func _next_day() -> void:
 	_enter_day()
 
 
+func _reset_touch() -> void:
+	_close_fan(false)
+	touch_dir = Vector2.ZERO
+	joy_index = -1
+	farmer.bot_input = Vector2.ZERO
+
+
 func _game_over() -> void:
 	phase = Phase.GAME_OVER
+	_reset_touch()
 	over_label.text = "THE FARM IS LOST\n\nYou made it to night %d." % night
+	if ux2:
+		over_label.text = "THE FARM IS LOST\n\nEvery animal was bitten and turned on night %d.\n\nNext time:\n- Carry bitten animals into the BARN (4 spots)\n- Buy a vaccine dart before night\n- Place planks on the glowing fence spots at dusk" % night
+		if army_total() > 0:
+			over_label.text += "\n\n(Your %d soldiers can't guard the herd at night. Keep enough animals at home.)" % army_total()
 	over_panel.visible = true
 	shop_panel.visible = false
 	_refresh_ui()
@@ -596,12 +803,12 @@ func _cost(item: String) -> int:
 	match item:
 		"repair": return 10
 		"vaccine": return 15
-		"fork": return 25 * fork_level
+		"fork": return 20 * fork_level
 		"fence": return 30 * fence_level
-		"chicken": return 10
-		"pig": return 20
-		"cow": return 35
-		"planks": return 10
+		"chicken": return 12
+		"pig": return 25
+		"cow": return 45
+		"planks": return 10 * (1 + bonus_planks / 3)
 		"train_chicken": return TRAIN_COST["chicken"]
 		"train_pig": return TRAIN_COST["pig"]
 		"train_cow": return TRAIN_COST["cow"]
@@ -636,6 +843,9 @@ func buy(item: String) -> void:
 			for i in SEGMENTS:
 				fence_hp[i] = fence_max
 		"chicken", "pig", "cow":
+			if animals.size() >= pen_cap():
+				popup(farmer.position + Vector2(0, -40), "the pen is full (upgrade fences)", Color(1, 0.6, 0.5))
+				return
 			_add_animal(item)
 		"planks":
 			bonus_planks += 3
@@ -645,6 +855,9 @@ func buy(item: String) -> void:
 			var a := _healthy_of(kind)
 			if a == null:
 				popup(farmer.position + Vector2(0, -40), "no %s in the herd to train" % kind, Color(1, 0.6, 0.5))
+				return
+			if healthy_count() <= 1:
+				popup(farmer.position + Vector2(0, -40), "keep at least one animal on the farm!", Color(1, 0.6, 0.5))
 				return
 			animals.erase(a)
 			a.queue_free()
@@ -697,6 +910,7 @@ func _save_into_barn(a: Node2D) -> void:
 	farmer.carrying = null
 	_resolve(a, "saved")
 	a.state = AnimalScript.State.SAFE
+	a.contact_time = 0.0
 	a.infect_time = 0.0
 	a.position = BARN_RECT.get_center()
 	a.visible = false
@@ -714,7 +928,9 @@ func action_carry(target: Node2D = null) -> void:
 			a.position = farmer.position + Vector2(18, 6)
 		return
 	if target == null:
-		target = _nearest_animal([0, 1])
+		target = _nearest_animal([AnimalScript.State.INFECTED])   # a bitten animal in reach wins over a healthy one
+		if target == null:
+			target = _nearest_animal([AnimalScript.State.HEALTHY])
 	if target and target.state == AnimalScript.State.INFECTED:
 		target.state = AnimalScript.State.CARRIED
 		farmer.carrying = target
@@ -742,15 +958,18 @@ func action_cure(target: Node2D = null) -> void:
 
 func action_cull(target: Node2D = null) -> void:
 	if target == null:
-		target = farmer.carrying if farmer.carrying else _nearest_animal([1, 3])
+		target = farmer.carrying if farmer.carrying else _nearest_animal([AnimalScript.State.INFECTED])   # zombies must be fought
 	if target == null:
 		return
 	if farmer.carrying == target:
 		farmer.carrying = null
 	animals.erase(target)
+	var fee := 0
 	if target.state != AnimalScript.State.ZOMBIE:
 		_resolve(target, "culled")
-	popup(target.position + Vector2(0, -30), CULL_LINES.pick_random(), Color(0.85, 0.85, 0.85))
+		fee = 5   # Uncle Gary's finder's fee, so sending one upstate is sometimes the right call
+		coins += fee
+	popup(target.position + Vector2(0, -30), CULL_LINES.pick_random() + ("  +%d" % fee if fee > 0 else ""), Color(0.85, 0.85, 0.85))
 	target.queue_free()
 	_refresh_ui()
 
@@ -834,8 +1053,10 @@ func _fan_center() -> Vector2:
 func _fan_button_at(p: Vector2) -> String:
 	if not fan_open:
 		return ""
-	for k in FAN_LAYOUT:
-		if p.distance_to(_fan_center() + FAN_LAYOUT[k]) <= FAN_BTN_R + 6.0:
+	var lay: Dictionary = FAN_LAYOUT_V2 if ux2 else FAN_LAYOUT
+	var rr: float = FAN_R_V2 if ux2 else FAN_BTN_R
+	for k in lay:
+		if p.distance_to(_fan_center() + lay[k]) <= rr + 6.0:
 			return k
 	return ""
 
@@ -857,7 +1078,7 @@ func _open_fan(screen_pos: Vector2) -> void:
 	fan_target = t
 	fan_open = true
 	fan_age = 0.0
-	fan_pos = Vector2(clampf(screen_pos.x, 150, screen.x - 150), clampf(screen_pos.y, 260, screen.y - 40))
+	fan_pos = Vector2(clampf(screen_pos.x, 215 if ux2 else 150, screen.x - (215 if ux2 else 150)), clampf(screen_pos.y, 300 if ux2 else 260, screen.y - 40))
 	stats["fan_opens"] += 1
 
 
@@ -931,7 +1152,7 @@ func _touch_tick(delta: float) -> void:
 			if a.state == AnimalScript.State.INFECTED:
 				if farmer.position.distance_to(a.position) < a.radius + 14.0:
 					a.contact_time += delta
-					if a.contact_time >= 0.25:
+					if a.contact_time >= AUTO_CARRY_T:
 						a.state = AnimalScript.State.CARRIED
 						farmer.carrying = a
 						stats["auto_carry"] += 1
@@ -940,8 +1161,8 @@ func _touch_tick(delta: float) -> void:
 						break
 				else:
 					a.contact_time = 0.0
-	# auto-save on entering the barn glow
-	if farmer.carrying and BARN_RECT.grow(16).has_point(farmer.position) and barn_used() < BARN_SLOTS:
+	# auto-save on entering the barn glow (_save_into_barn warns once a night if the barn is full)
+	if farmer.carrying and BARN_RECT.grow(16).has_point(farmer.position):
 		_save_into_barn(farmer.carrying)
 
 
@@ -962,6 +1183,7 @@ func _process(delta: float) -> void:
 		while plan_i < plan.size() and night_time >= float(plan[plan_i]["t"]):
 			_spawn_group(plan[plan_i])
 			plan_i += 1
+		chew_claims.clear()
 		for z in zombies.duplicate():
 			z.tick(delta)
 		for a in animals.duplicate():
@@ -976,12 +1198,25 @@ func _process(delta: float) -> void:
 			_end_night()
 		elif animals.is_empty():
 			_game_over()
-		timer_label.text = "Sunrise in %ds   |   turn timer %ds (T)" % [int(ceil(max(0.0, night_length - night_time))), int(turn_timer)]
+		timer_label.text = "Sunrise in %ds" % int(ceil(max(0.0, night_length - night_time)))
 	else:
 		for a in animals:
 			a.tick(delta)
 	_update_hint()
 	top_label.text = "Day %d  Coins %d  Darts %d  Bits %d  Herd %d  Barn %d/%d\nArmy: %d hens  %d pigs  %d cows  %d Dead Stock   Ribbons %d" % [night, coins, vaccines, parts, healthy_count(), barn_used(), BARN_SLOTS, army["chicken"], army["pig"], army["cow"], dead_stock, ribbons]
+	if ux2:
+		var lbl := "NIGHT" if phase == Phase.NIGHT else ("DUSK" if phase == Phase.DUSK else "DAY")
+		top_label.text = "%s %d    Coins %d    Darts %d    Herd %d" % [lbl, night, coins, vaccines, healthy_count()]
+		if army_total() > 0 and phase == Phase.DAY:
+			top_label.text += "\nArmy %d" % army_total()
+		if phase == Phase.NIGHT:
+			timer_label.text = "Sunrise in %ds    Barn %d/%d" % [int(ceil(max(0.0, night_length - night_time))), barn_used(), BARN_SLOTS]
+			if farmer.stamina < 1.0:
+				show_banner("stamina", 4.0)
+		if banner_t > 0.0:
+			banner_t -= delta / maxf(Engine.time_scale, 0.01)
+			if banner_t <= 0.0:
+				banner_panel.visible = false
 	timer_label.visible = phase == Phase.NIGHT
 	forecast_label.visible = phase == Phase.DUSK
 	queue_redraw()
@@ -1011,7 +1246,10 @@ func _spawn_group(g: Dictionary) -> void:
 		if not seen_types.has(ty):
 			seen_types[ty] = true
 			if ty != "walker":
-				popup(PEN_CENTER + Vector2(0, -60), TYPE_TIPS[ty], Color(1, 0.85, 0.5), 15)
+				if ux2:
+					show_banner(ty, 7.0)
+				else:
+					popup(PEN_CENTER + Vector2(0, -60), TYPE_TIPS[ty], Color(1, 0.85, 0.5), 15)
 		for i in int(units[ty]):
 			_spawn_zombie(side, ty)
 			to_spawn -= 1
@@ -1019,7 +1257,7 @@ func _spawn_group(g: Dictionary) -> void:
 
 func _spawn_zombie(side: int, ty := "walker") -> void:
 	var z: Node2D = ZombieScript.new()
-	var jitter := randf_range(-90, 90)
+	var jitter := randf_range(-55, 55)
 	# portrait: east/west hordes spawn just off the narrower visible edge
 	var ew := 220.0 if portrait else 660.0
 	match side:
@@ -1027,15 +1265,19 @@ func _spawn_zombie(side: int, ty := "walker") -> void:
 		1: z.position = Vector2(640 + jitter, 750 + randf() * 60)
 		2: z.position = Vector2(640 - ew - 20 - randf() * 60, 400 + jitter)
 		_: z.position = Vector2(640 + ew + 20 + randf() * 60, 400 + jitter)
+	z.position = PEN_CENTER + (z.position - PEN_CENTER).rotated(LANE_SHIFT)
 	entity_layer.add_child(z)
 	z.setup(self, night, ty)
 	zombies.append(z)
 
 
 func _update_hint() -> void:
+	if ux2:
+		_update_hint_v2()
+		return
 	match phase:
 		Phase.DAY:
-			hint_label.text = "DAY: shop, then START NIGHT (Space).  T = turn timer test value"
+			hint_label.text = "DAY: shop, then START NIGHT (Space)."
 		Phase.NIGHT:
 			if farmer.carrying:
 				hint_label.text = "Carrying: walk into the BARN glow to save it."
@@ -1095,7 +1337,9 @@ func _draw_overlay() -> void:
 		o.draw_circle(joy_origin, JOY_RADIUS, Color(1, 1, 1, 0.10))
 		o.draw_arc(joy_origin, JOY_RADIUS, 0, TAU, 32, Color(1, 1, 1, 0.35), 2.0)
 		o.draw_circle(joy_origin + touch_dir * JOY_RADIUS, 26, Color(1, 1, 1, 0.35))
-	if fan_open:
+	if fan_open and ux2:
+		_draw_fan_v2(o)
+	elif fan_open:
 		var font := ThemeDB.fallback_font
 		var cols := {"carry": Color(0.30, 0.75, 0.29), "cure": Color(0.25, 0.71, 1.0), "chain": Color(0.6, 0.45, 0.85), "cull": Color(0.9, 0.28, 0.23)}
 		var labels := {"carry": "SAVE", "cure": "CURE", "chain": "CHAIN", "cull": "HOLD\nUPSTATE"}
@@ -1186,7 +1430,7 @@ func _build_ui() -> void:
 		btn.clip_text = true
 		btn.custom_minimum_size = Vector2(0, 52 if portrait else 0)  # >= 48 dp touch targets
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.pressed.connect(buy.bind(item))
+		btn.pressed.connect(func(): if not _fresh_panel(): buy(item))
 		btn.focus_mode = Control.FOCUS_NONE
 		grid.add_child(btn)
 		shop_buttons[item] = btn
@@ -1200,14 +1444,15 @@ func _build_ui() -> void:
 		nb2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		nb2.focus_mode = Control.FOCUS_NONE
 		nb2.add_theme_font_size_override("font_size", 18)
-		nb2.pressed.connect(pair[1])
+		var cb: Callable = pair[1]
+		nb2.pressed.connect(func(): if not _fresh_panel(): cb.call())
 		nav.add_child(nb2)
 	var start := Button.new()
 	start.text = "START NIGHT"
 	start.custom_minimum_size = Vector2(0, 72 if portrait else 0)
 	start.focus_mode = Control.FOCUS_NONE
 	start.add_theme_font_size_override("font_size", 22)
-	start.pressed.connect(start_night)
+	start.pressed.connect(func(): if not _fresh_panel(): start_night())
 	v.add_child(start)
 
 	var dpos := Vector2(30, screen.y * 0.30) if portrait else Vector2(300, 150)
@@ -1319,6 +1564,8 @@ func _build_ui() -> void:
 	clr.custom_minimum_size = Vector2(150, 60)
 	clr.focus_mode = Control.FOCUS_NONE
 	clr.pressed.connect(func():
+		if _fresh_panel():
+			return
 		for sg in pieces:
 			planks += int(PIECE_COST[pieces[sg]])
 		pieces.clear()
@@ -1331,22 +1578,27 @@ func _build_ui() -> void:
 	go.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	go.focus_mode = Control.FOCUS_NONE
 	go.add_theme_font_size_override("font_size", 20)
-	go.pressed.connect(begin_night)
+	go.pressed.connect(func(): if not _fresh_panel(): begin_night())
 	dr.add_child(go)
 	dusk_panel.visible = false
+	if ux2:
+		_build_ui_v2()
 
 
 func _refresh_ui() -> void:
 	if shop_buttons.is_empty():
+		return
+	if ux2:
+		_refresh_ui_v2()
 		return
 	var names := {
 		"repair": "Repair fences",
 		"vaccine": "Vaccine dart (%d)" % vaccines,
 		"fork": "Pitchfork Lv %d (+stamina)" % fork_level,
 		"fence": "Fences Lv %d (+1 plank)" % fence_level,
-		"chicken": "Chicken +3",
-		"pig": "Pig +6",
-		"cow": "Cow +10",
+		"chicken": "Chicken +4",
+		"pig": "Pig +7",
+		"cow": "Cow +12",
 		"planks": "3 planks (%d stored)" % bonus_planks,
 		"train_chicken": "Train hen bomber",
 		"train_pig": "Train pig brawler",
@@ -1354,9 +1606,9 @@ func _refresh_ui() -> void:
 	}
 	for item in shop_buttons:
 		var btn: Button = shop_buttons[item]
-		btn.text = "%s - %d" % [names[item], _cost(item)]
+		btn.text = "%s\n%d coins" % [names[item], _cost(item)]   # price on its own line so clip_text never hides it
 		btn.disabled = coins < _cost(item)
-		if item.begins_with("train_") and _healthy_of(item.trim_prefix("train_")) == null:
+		if item.begins_with("train_") and (_healthy_of(item.trim_prefix("train_")) == null or healthy_count() <= 1):
 			btn.disabled = true
 
 
@@ -1393,9 +1645,9 @@ func _make_plan() -> void:
 		avail.append("bloater")
 	var featured: String = avail[mini(night - 1, avail.size() - 1)]   # the newest type always shows up
 	var waves: int = 2 if night == 1 else (3 if night <= 3 else (4 if night <= 7 else 5))
-	var budget: float = 6.0 + 4.0 * night
+	var budget: float = (5.0 + 3.0 * night + 0.08 * night * night) * horde_scale
 	var gap: float = maxf(9.0, 15.0 - night)
-	var cost := {"walker": 1.0, "brute": 3.0, "crow": 0.75, "bloater": 3.0}
+	var cost := {"walker": 1.0, "brute": 3.0, "crow": 1.0, "bloater": 3.0}
 	var last_side := -1
 	var t := 4.0
 	for w in waves:
@@ -1407,7 +1659,7 @@ func _make_plan() -> void:
 		var wb: float = budget / waves
 		if w == 1 or (waves == 2 and w == 0 and featured != "walker"):
 			if featured != "walker":
-				var n_f := 3 if featured == "crow" else 1
+				var n_f := 2 if featured == "crow" else 1
 				units[featured] = n_f
 				wb -= cost[featured] * n_f
 		elif w >= 2 and avail.size() > 1:
@@ -1427,7 +1679,7 @@ func _make_plan() -> void:
 	for g in plan:
 		for ty in g["units"]:
 			to_spawn += int(g["units"][ty])
-	night_length = t + 26.0
+	night_length = t + NIGHT_TAIL
 
 
 func _forecast_text() -> String:
@@ -1440,12 +1692,15 @@ func _forecast_text() -> String:
 	if pending_raid >= 0:
 		lines.append("  0:16  RIVAL RAID: %s's gang (steals coins, ignores the herd)" % RaidScript.RIVALS[pending_raid]["owner"])
 	for ty in ["brute", "crow", "bloater"]:
-		if types.has(ty):
+		if types.has(ty) and not seen_types.has(ty):   # tips only for types you haven't met yet (keeps the list off the pen)
 			lines.append(TYPE_TIPS[ty])
 	return "\n".join(lines)
 
 
 func _refresh_dusk() -> void:
+	if ux2:
+		_refresh_dusk_v2()
+		return
 	forecast_label.text = _forecast_text()
 	planks_label.text = "DUSK PLANNING: %d planks left" % planks
 	var names := {"barricade": "Barricade (1)", "spikes": "Spikes (2)", "scarecrow": "Scarecrow (2)"}
@@ -1480,21 +1735,32 @@ func place_piece(seg: int, pc: String) -> bool:
 	pieces[seg] = pc
 	planks -= int(PIECE_COST[pc])
 	if pc == "scarecrow":
-		scarecrow_hp[seg] = 60.0
+		scarecrow_hp[seg] = SCARECROW_HP
 	return true
 
 
 func _auto_plan() -> void:
-	## bot / sweep: a simple sensible plan (scarecrow for crows, barricade brutes, spikes elsewhere)
-	for g in plan:
+	## bot / sweep: a sensible player reading the forecast, biggest waves first. Spikes on every lane they
+	## can afford (they also pop bloaters OUTSIDE the fence), barricade lanes led by brutes (spikes only do
+	## half), a scarecrow next to the first crow lane, then barricade the lanes still bare.
+	var order := plan.duplicate()
+	order.sort_custom(func(x, y): return _threat(x) > _threat(y))
+	var crow_done := false
+	for g in order:
 		var seg := segment_at(PEN_CENTER + SIDE_DIRS[g["side"]] * PEN_RADIUS)
 		var u: Dictionary = g["units"]
-		if u.has("crow") and not pieces.values().has("scarecrow"):
-			place_piece((seg + 1) % SEGMENTS, "scarecrow")
-		if u.has("brute"):
+		if pieces.has(seg):
+			continue
+		if int(u.get("brute", 0)) * 3 >= int(u.get("walker", 0)):
 			place_piece(seg, "barricade")
 		elif not place_piece(seg, "spikes"):
 			place_piece(seg, "barricade")
+		if u.has("crow") and not crow_done:
+			crow_done = place_piece((seg + 1) % SEGMENTS, "scarecrow")
+	if SLIDE_RATE > 0.0:
+		for g in order:
+			for k in [1, -1]:
+				place_piece((segment_at(PEN_CENTER + SIDE_DIRS[g["side"]] * PEN_RADIUS) + k + SEGMENTS) % SEGMENTS, "barricade")
 
 
 func decoy_point_for(pos: Vector2, ty: String) -> Vector2:
@@ -1503,7 +1769,7 @@ func decoy_point_for(pos: Vector2, ty: String) -> Vector2:
 		return PEN_CENTER
 	var ang := (pos - PEN_CENTER).angle()
 	var best := -1
-	var best_d := deg_to_rad(75.0)
+	var best_d := deg_to_rad(50.0)
 	for seg in pieces:
 		if pieces[seg] != "scarecrow":
 			continue
@@ -1546,9 +1812,9 @@ func bloater_burst(z: Node2D, contact: bool) -> void:
 	z.dead = true
 	var hit := 0
 	for a in animals.duplicate():
-		if a.is_bitable() and a.position.distance_to(z.position) < ZombieScript.BURST_RADIUS:
-			bite(a, z)
-			hit += 1
+		if a.is_bitable() and a.position.distance_to(z.position) < BURST_RADIUS:
+			if bite(a, z):
+				hit += 1
 	popup(z.position + Vector2(0, -20), "BLOATER BURST! %s" % ("%d bitten" % hit if hit > 0 else "nobody hurt"), Color(0.9, 0.5, 1.0) if hit > 0 else Color(0.8, 1, 0.6), 18)
 	if not contact:
 		pass
@@ -1579,9 +1845,25 @@ func _draw_plan() -> void:
 				draw_circle(p + Vector2(0, -14), 6, Color(0.95, 0.85, 0.5))
 				draw_rect(Rect2(p + Vector2(-8, -22), Vector2(16, 4)), Color(0.85, 0.7, 0.3))
 				if scarecrow_hp.has(seg):
-					draw_rect(Rect2(p + Vector2(-12, 18), Vector2(24 * float(scarecrow_hp[seg]) / 60.0, 3)), Color(0.95, 0.75, 0.2))
+					draw_rect(Rect2(p + Vector2(-12, 18), Vector2(24 * float(scarecrow_hp[seg]) / SCARECROW_HP, 3)), Color(0.95, 0.75, 0.2))
+	if ux2 and phase == Phase.DUSK:
+		var hot := _wave_segments()
+		var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 220.0)
+		for sg in SEGMENTS:
+			if pieces.has(sg):
+				continue
+			var sp := PEN_CENTER + _seg_dir(sg) * PEN_RADIUS
+			if hot.has(sg):
+				draw_circle(sp, 22.0, Color(1, 0.6, 0.2, 0.35 * pulse))
+				draw_arc(sp, 22.0, 0, TAU, 24, Color(1, 0.8, 0.3, pulse), 3.0)
+			else:
+				draw_arc(sp, 15.0, 0, TAU, 20, Color(1, 1, 1, 0.45), 2.0)
+			draw_string_outline(font, sp + Vector2(-6, 7), "+", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 4, Color(0, 0, 0, 0.7))
+			draw_string(font, sp + Vector2(-6, 7), "+", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.95, 0.8))
+	if ux2 and (phase == Phase.DUSK or phase == Phase.NIGHT):
+		_draw_wave_labels_v2(font)
 	# forecast arrows for waves that haven't arrived yet
-	if phase == Phase.DUSK or phase == Phase.NIGHT:
+	elif phase == Phase.DUSK or phase == Phase.NIGHT:
 		var shown := {}
 		for i in range(plan_i if phase == Phase.NIGHT else 0, plan.size()):
 			var g: Dictionary = plan[i]
@@ -1597,7 +1879,11 @@ func _draw_plan() -> void:
 			draw_colored_polygon(PackedVector2Array([tip, tip - d * 14.0 + d.orthogonal() * 9.0, tip - d * 14.0 - d.orthogonal() * 9.0]), col)
 			var txt := "0:%02d %s" % [int(g["t"]), _short_units(g["units"])]
 			var lp := tail + d * 12.0 + Vector2(-30, 4 + 16 * k)
-			if side == 2:
+			if portrait and side == 0:     # north: below the fence, not under the forecast text
+				lp = PEN_CENTER + d * (PEN_RADIUS - 30.0) + Vector2(-30, 14 + 16 * k)
+			elif portrait and side == 1:   # south: above the fence, not under the dusk panel
+				lp = PEN_CENTER + d * (PEN_RADIUS - 30.0) + Vector2(-30, -4 - 16 * k)
+			elif side == 2:
 				lp = PEN_CENTER + d * (PEN_RADIUS - 36.0) + Vector2(0, -24 + 16 * k)
 			elif side == 3:
 				lp = PEN_CENTER + d * (PEN_RADIUS - 36.0) + Vector2(-62, -24 + 16 * k)
@@ -1623,6 +1909,14 @@ func _healthy_of(kind: String) -> Node2D:
 	return null
 
 
+func pen_cap() -> int:
+	return PEN_BASE + PEN_PER_FENCE * fence_level
+
+
+func spike_dps() -> float:
+	return SPIKE_DPS + SPIKE_DPS_PER_NIGHT * night
+
+
 func army_total() -> int:
 	return int(army["chicken"]) + int(army["pig"]) + int(army["cow"]) + dead_stock
 
@@ -1644,6 +1938,9 @@ func open_county() -> void:
 		if night < int(r["unlock"]):
 			b.text = "LOCKED until day %d: %s" % [r["unlock"], r["name"]]
 			b.disabled = true
+		elif int(rival_week.get(i, -1)) == week():
+			b.text = "FLATTENED this week: %s\nThey rebuild on day %d" % [r["name"], (week() + 1) * 7 + 1]
+			b.disabled = true
 		else:
 			b.text = "%s  %s\nOwner: %s   Loot up to ~%d coins" % ["*".repeat(stars) + "-".repeat(3 - stars), r["name"], r["owner"], int(r["loot"]) + 30]
 			b.disabled = army_total() == 0 or raids_today >= RAIDS_PER_DAY
@@ -1651,7 +1948,9 @@ func open_county() -> void:
 
 
 func start_raid(i: int) -> void:
-	if army_total() == 0 or raids_today >= RAIDS_PER_DAY or phase != Phase.DAY:
+	if army_total() == 0 or raids_today >= RAIDS_PER_DAY or phase != Phase.DAY or overlay != null:
+		return
+	if night < int(RaidScript.RIVALS[i]["unlock"]) or int(rival_week.get(i, -1)) == week():
 		return
 	county_panel.visible = false
 	var r: Node2D = RaidScript.new()
@@ -1662,7 +1961,14 @@ func start_raid(i: int) -> void:
 
 
 func _on_raid_finished(res: Dictionary) -> void:
+	if overlay == null:
+		return
 	var i: int = int(res["rival"])
+	# rivals rebuild weekly; a farm you already hit this week has less left to take
+	var key := "%d:%d" % [i, week()]
+	var k: int = int(raid_counts.get(key, 0))
+	res["loot"] = int(round(float(res["loot"]) * pow(LOOT_REPEAT, k)))
+	raid_counts[key] = k + 1
 	coins += int(res["loot"])
 	ribbons += int(res["stars"]) * 10
 	var sv: Dictionary = res["survivors"]
@@ -1671,8 +1977,11 @@ func _on_raid_finished(res: Dictionary) -> void:
 	army["cow"] = int(sv["cow"])
 	dead_stock = int(sv["undead"])
 	rival_best[i] = max(int(rival_best.get(i, 0)), int(res["stars"]))
-	raids_today += 1
-	last_raided_rival = i
+	if int(res["stars"]) > 0:
+		rival_week[i] = week()
+	if int(res.get("deployed", 1)) > 0:   # backing out without dropping a unit doesn't use up a raid
+		raids_today += 1
+		last_raided_rival = i
 	_close_overlay()
 	shop_panel.visible = true
 	popup(PEN_CENTER + Vector2(0, -150), "Raid: +%d coins, %d stars" % [res["loot"], res["stars"]], Color(1, 0.85, 0.3), 20)
@@ -1726,9 +2035,10 @@ func _close_overlay() -> void:
 func _spawn_raid_gang() -> void:
 	raid_spawn_at = -1.0
 	var r: Dictionary = RaidScript.RIVALS[raid_rival]
-	var n: int = mini(3 + raid_rival * 2, 9)
+	var n: int = 3 + raid_rival
 	var side := randi() % 4
 	var names := ["NORTH", "SOUTH", "WEST", "EAST"]
+	show_banner("raid", 6.0)
 	popup(PEN_CENTER + Vector2(0, -230), "%s'S GANG RAIDS FROM THE %s!" % [String(r["owner"]).to_upper(), names[side]], Color(1, 0.6, 0.3), 20)
 	var ew := 220.0 if portrait else 660.0
 	for i in n:
@@ -1746,7 +2056,7 @@ func _spawn_raid_gang() -> void:
 
 
 func raider_steal(r: Node2D) -> int:
-	var amt: int = mini(int(coins * 0.12), 12 + 6 * raid_rival)
+	var amt: int = mini(int(coins * 0.15), 15 + 10 * raid_rival)
 	amt = max(amt, 0)
 	coins -= amt
 	raid_stats["stolen"] += amt
@@ -1840,69 +2150,233 @@ func _autotest_overlay(delta: float) -> void:
 ## (auto-carry + auto-save), never culls or chains. Buys a dart and repairs each day.
 
 func _sweep_bot(_delta: float) -> void:
+	## Sweep bot. Default "human" triage: notices a bite ~bot_react s later (+-25 %), thinks 0.5 s,
+	## does ONE thing at a time, pushes the stick ~85 %, carries to the barn or darts it on the spot.
 	match phase:
 		Phase.DAY:
-			if coins >= _cost("vaccine"):
-				buy("vaccine")
-			if coins >= _cost("repair"):
-				buy("repair")
+			_eval_shop()
 			bot_focus = null
+			bot_notice.clear()
+			bot_busy_until = 0.0
+			bot_focus_ready_at = 0.0
 			start_night()
 		Phase.NIGHT:
-			if farmer.carrying:
-				if barn_used() >= BARN_SLOTS:
-					var c: Node2D = farmer.carrying
-					if vaccines > 0:
-						action_cure(c)
-					elif chain_posts > 0:
-						action_chain(c)
-					else:
-						action_cull(c)
-					return
-				farmer.bot_input = (BARN_RECT.get_center() - farmer.position).normalized()
-				return
-			if sweep_lazy:
-				var near := _nearest_animal([AnimalScript.State.INFECTED])
-				if near:
-					if vaccines > 0:
-						action_cure(near)
-					else:
-						action_carry(near)
-					return
-				var ez := nearest_enemy(farmer.position, 2000.0)
-				farmer.bot_input = (ez.position - farmer.position).normalized() if ez and farmer.position.distance_to(ez.position) > 50.0 else Vector2.ZERO
-				return
-			if bot_focus == null or not is_instance_valid(bot_focus) or bot_focus.state != AnimalScript.State.INFECTED:
-				bot_focus = null
-				var best: Node2D = null
-				var best_d := INF
-				for a in animals:
-					if a.state == AnimalScript.State.INFECTED and night_time - a.bitten_at >= bot_react:
-						var d := farmer.position.distance_squared_to(a.position)
-						if d < best_d:
-							best_d = d
-							best = a
-				bot_focus = best
-				bot_focus_ready_at = night_time + 0.35  # decision time once noticed
-			if bot_focus:
-				if night_time < bot_focus_ready_at:
-					farmer.bot_input = Vector2.ZERO
-					return
-				var dist := farmer.position.distance_to(bot_focus.position)
-				var to_barn := bot_focus.position.distance_to(BARN_RECT.get_center())
-				if vaccines > 0 and dist < ACTION_RANGE - 4 and to_barn > 90.0:
-					action_cure(bot_focus)
-					bot_focus = null
-				else:
-					farmer.bot_input = (bot_focus.position - farmer.position).normalized()
-			else:
-				var e := nearest_enemy(farmer.position, 2000.0)
-				if e and farmer.position.distance_to(e.position) > 50.0:
-					farmer.bot_input = (e.position - farmer.position).normalized()
-				else:
-					farmer.bot_input = Vector2.ZERO
+			farmer.bot_input = Vector2.ZERO
+			if bot_triage == "lazy":
+				_lazy_tick()
+			elif bot_triage == "none" or not _triage_tick():
+				_fight_tick()
+			if farmer.bot_input != Vector2.ZERO and bot_triage == "human":
+				farmer.bot_input = farmer.bot_input.normalized() * bot_stick
 		Phase.GAME_OVER:
 			_sweep_after_night({})
+
+
+func _lazy_tick() -> void:
+	## the original "drag and auto-fight" player: only reacts to bites it bumps into
+	if farmer.carrying:
+		_carry_tick()
+		return
+	var near := _nearest_animal([AnimalScript.State.INFECTED])
+	if near:
+		if vaccines > 0:
+			action_cure(near)
+		else:
+			action_carry(near)
+		return
+	var ez := nearest_enemy(farmer.position, 2000.0)
+	farmer.bot_input = (ez.position - farmer.position).normalized() if ez and farmer.position.distance_to(ez.position) > 50.0 else Vector2.ZERO
+
+
+func _carry_tick() -> void:
+	if barn_used() >= BARN_SLOTS:
+		var c: Node2D = farmer.carrying
+		if vaccines > 0:
+			action_cure(c)
+		elif chain_posts > 0:
+			action_chain(c)
+		else:
+			action_cull(c)
+		bot_busy_until = night_time + 0.4
+		return
+	farmer.bot_input = (BARN_RECT.get_center() - farmer.position).normalized()
+
+
+func _noticed(a: Node2D) -> bool:
+	if bot_triage == "perfect":
+		return true
+	var rec: Array = bot_notice.get(a, [])
+	if rec.is_empty() or float(rec[0]) != float(a.bitten_at):
+		rec = [a.bitten_at, a.bitten_at + bot_react * randf_range(0.75, 1.25)]
+		bot_notice[a] = rec
+	return night_time >= float(rec[1])
+
+
+func _triage_tick() -> bool:
+	## true when triage owns the farmer this frame
+	if farmer.carrying:
+		_carry_tick()
+		return true
+	if night_time < bot_busy_until:
+		return true
+	if bot_focus == null or not is_instance_valid(bot_focus) or bot_focus.state != AnimalScript.State.INFECTED:
+		if bot_focus != null:
+			bot_busy_until = night_time + (0.0 if bot_triage == "perfect" else 0.4)   # re-orient after an action
+			bot_focus = null
+			return true
+		var best: Node2D = null
+		var best_score := INF
+		for a in animals:
+			if a.state == AnimalScript.State.INFECTED and _noticed(a):
+				var d := farmer.position.distance_to(a.position)
+				var score: float = d
+				if bot_triage == "perfect":
+					score = float(a.infect_time) - d / float(farmer.speed)
+					if score < 0.0:
+						score = 1000.0 + d
+				if score < best_score:
+					best_score = score
+					best = a
+		if best == null:
+			return false
+		bot_focus = best
+		bot_focus_ready_at = night_time + (0.0 if bot_triage == "perfect" else 0.5)
+	if night_time < bot_focus_ready_at:
+		return true
+	var dist := farmer.position.distance_to(bot_focus.position)
+	var to_barn := bot_focus.position.distance_to(BARN_RECT.get_center())
+	if vaccines > 0 and dist < ACTION_RANGE - 4 and (to_barn > 90.0 or barn_used() >= BARN_SLOTS):
+		action_cure(bot_focus)
+		bot_focus = null
+		bot_busy_until = night_time + (0.0 if bot_triage == "perfect" else 0.4)
+		return true
+	farmer.bot_input = (bot_focus.position - farmer.position).normalized()
+	return true
+
+
+func _fight_tick() -> void:
+	var goal := Vector2.ZERO
+	var have := false
+	match bot_fight:
+		"idle":
+			goal = BARN_RECT.get_center() + Vector2(0, 50)
+			have = true
+		"guard":
+			var best_d := INF
+			for z in zombies:
+				if z.position.distance_to(PEN_CENTER) < PEN_RADIUS:
+					var d := z.position.distance_to(PEN_CENTER)
+					if d < best_d:
+						best_d = d
+						goal = z.position
+						have = true
+			for a in animals:
+				if a.is_enemy():
+					goal = a.position
+					have = true
+			if not have:
+				var low := INF
+				for z in zombies:
+					if z.get("chewing") == true:
+						var seg := segment_at(z.position)
+						if fence_hp[seg] < low:
+							low = fence_hp[seg]
+							goal = PEN_CENTER + (z.position - PEN_CENTER).normalized() * (PEN_RADIUS - 30.0)
+							have = true
+			if not have and plan_i < plan.size():
+				goal = PEN_CENTER + SIDE_DIRS[plan[plan_i]["side"]] * (PEN_RADIUS - 40.0)
+				have = true
+		_:
+			var e := nearest_enemy(farmer.position, 2000.0)
+			if e:
+				goal = e.position
+				have = true
+	if have and farmer.position.distance_to(goal) > 40.0:
+		farmer.bot_input = (goal - farmer.position).normalized()
+
+
+func _eval_shop() -> void:
+	if bot_shop == "campaign":
+		var damaged := false
+		for i in SEGMENTS:
+			if fence_hp[i] < fence_max:
+				damaged = true
+		if damaged and coins >= _cost("repair"):
+			buy("repair")
+		while vaccines < 2 and coins >= _cost("vaccine"):
+			buy("vaccine")
+		var guard := 0
+		while healthy_count() < 6 and coins >= _cost("chicken") and guard < 10:
+			guard += 1
+			buy("chicken")
+		return
+	if coins >= _cost("vaccine"):
+		buy("vaccine")
+	if coins >= _cost("repair"):
+		buy("repair")
+
+
+func _plan_total() -> int:
+	var n := 0
+	for g in plan:
+		for ty in g["units"]:
+			n += int(g["units"][ty])
+	return n
+
+
+func _lane_seg(side: int) -> int:
+	return segment_at(PEN_CENTER + SIDE_DIRS[side] * PEN_RADIUS)
+
+
+func _eval_plan() -> void:
+	match bot_planner:
+		"none":
+			pass
+		"auto":
+			_auto_plan()
+		"random":
+			var tries := 0
+			while planks > 0 and tries < 60:
+				tries += 1
+				place_piece(randi() % SEGMENTS, ["barricade", "spikes", "scarecrow"].pick_random())
+		"spikes_lane":
+			for g in plan:
+				place_piece(_lane_seg(g["side"]), "spikes")
+		"barricade":
+			for g in plan:
+				place_piece(_lane_seg(g["side"]), "barricade")
+			for g in plan:
+				for k in [1, -1]:
+					place_piece((_lane_seg(g["side"]) + k + SEGMENTS) % SEGMENTS, "barricade")
+		"funnel":
+			place_piece(10, "scarecrow")
+			place_piece(4, "scarecrow")
+			for seg in [9, 11, 3, 5]:
+				place_piece(seg, "barricade")
+		"smart":
+			var order := plan.duplicate()
+			order.sort_custom(func(x, y): return _threat(x) > _threat(y))
+			for g in order:
+				var u: Dictionary = g["units"]
+				var seg := _lane_seg(g["side"])
+				if u.has("crow") and not pieces.values().has("scarecrow"):
+					place_piece((seg + 1) % SEGMENTS, "scarecrow")
+				if u.has("brute") or u.has("bloater"):
+					if not place_piece(seg, "barricade"):
+						pass
+				elif not place_piece(seg, "spikes"):
+					place_piece(seg, "barricade")
+			for g in order:
+				for k in [1, -1]:
+					place_piece((_lane_seg(g["side"]) + k + SEGMENTS) % SEGMENTS, "barricade")
+
+
+func _threat(g: Dictionary) -> float:
+	var v := 0.0
+	var u: Dictionary = g["units"]
+	for ty in u:
+		v += float(u[ty]) * {"walker": 1.0, "brute": 3.0, "crow": 0.5, "bloater": 3.0}[ty]
+	return v
 
 
 func _sweep_after_night(rec: Dictionary) -> void:
@@ -1927,6 +2401,8 @@ func _sweep_after_night(rec: Dictionary) -> void:
 	if not rec.is_empty() and night < sweep_start_night + sweep_nights and not animals.is_empty():
 		_enter_day()
 		return
+	print("[run] ", JSON.stringify({"planner": bot_planner, "triage": bot_triage, "fight": bot_fight, "shop": bot_shop,
+		"start": sweep_start_night, "last_night": night - 1, "herd_end": healthy_count(), "wiped": healthy_count() == 0, "coins": coins}))
 	sweep_run += 1
 	if sweep_run >= sweep_runs:
 		sweep_run = 0
@@ -1936,7 +2412,7 @@ func _sweep_after_night(rec: Dictionary) -> void:
 		get_tree().quit()
 		return
 	turn_timer = sweep_values[sweep_idx]
-	seed(1000 + sweep_run)
+	seed(eval_seed + sweep_run)
 	_new_game()
 
 
@@ -2051,3 +2527,413 @@ func _autotest(delta: float) -> void:
 			if autotest_t > 2.0:
 				print("[autotest] game over at night ", night)
 				get_tree().quit()
+
+
+# ================================================================ UX eval v2 (eval copy only)
+
+func _btn_style(bg: Color, border := Color(0, 0, 0, 0)) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(14)
+	sb.set_content_margin_all(10)
+	if border.a > 0.0:
+		sb.border_color = border
+		sb.set_border_width_all(4)
+	return sb
+
+
+func _big_button(text: String, h: int, fs: int, bg := Color(0.2, 0.19, 0.17)) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(0, h)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", fs)
+	b.add_theme_stylebox_override("normal", _btn_style(bg))
+	b.add_theme_stylebox_override("hover", _btn_style(bg.lightened(0.12)))
+	b.add_theme_stylebox_override("pressed", _btn_style(bg.darkened(0.2)))
+	b.add_theme_stylebox_override("disabled", _btn_style(Color(0.16, 0.15, 0.14, 0.9)))
+	b.add_theme_color_override("font_disabled_color", Color(0.55, 0.52, 0.48))
+	return b
+
+
+func _build_ui_v2() -> void:
+	for l in [top_label, timer_label]:
+		l.add_theme_font_size_override("font_size", 28)
+		l.add_theme_constant_override("outline_size", 8)
+	timer_label.position = Vector2(14, 48)
+	hint_label.add_theme_font_size_override("font_size", 24)
+	hint_label.add_theme_constant_override("outline_size", 7)
+	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint_label.custom_minimum_size = Vector2(screen.x - 28, 0)
+	hint_label.size = Vector2(screen.x - 28, 0)
+	hint_label.position = Vector2(14, screen.y - 140)
+	keys_label = Label.new()
+	keys_label.add_theme_font_size_override("font_size", 18)
+	keys_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8))
+	keys_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	keys_label.add_theme_constant_override("outline_size", 5)
+	keys_label.position = Vector2(14, screen.y - 32)
+	keys_label.visible = not DisplayServer.is_touchscreen_available()
+	ui.add_child(keys_label)
+	# tip banner (replaces 1.8 s floating tips that ran off-screen)
+	banner_panel = _panel(Vector2(16, 112), Vector2(screen.x - 32, 0))
+	var bsb: StyleBoxFlat = banner_panel.get_theme_stylebox("panel").duplicate()
+	bsb.bg_color = Color(0.16, 0.08, 0.2, 0.93)
+	bsb.border_color = Color(0.85, 0.5, 1.0)
+	bsb.set_border_width_all(4)
+	banner_panel.add_theme_stylebox_override("panel", bsb)
+	banner_label = Label.new()
+	banner_label.add_theme_font_size_override("font_size", 25)
+	banner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	banner_label.custom_minimum_size = Vector2(screen.x - 64, 0)
+	banner_panel.add_child(banner_label)
+	banner_panel.visible = false
+	# ---- farm store v2: 2 columns, 92 px (46 dp) rows, short benefit line, progressive unlocks
+	shop_panel.queue_free()
+	shop_buttons.clear()
+	shop_panel = _panel(Vector2(16, screen.y - 600), Vector2(screen.x - 32, 0))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	shop_panel.add_child(v)
+	var head := Label.new()
+	head.text = "FARM STORE: get ready for tonight"
+	head.add_theme_font_size_override("font_size", 26)
+	head.add_theme_color_override("font_color", Color(1, 0.85, 0.4))
+	v.add_child(head)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	v.add_child(grid)
+	for item in ["vaccine", "planks", "repair", "chicken", "fork", "fence", "pig", "cow", "train_chicken", "train_pig", "train_cow"]:
+		var btn := _big_button("", 96, 21)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.pressed.connect(buy.bind(item))
+		grid.add_child(btn)
+		shop_buttons[item] = btn
+	var nav := HBoxContainer.new()
+	nav.add_theme_constant_override("separation", 10)
+	v.add_child(nav)
+	for pair in [["RIVAL RAIDS", open_county], ["FENCE FIXER\npuzzles, +coins", open_fence_fixer]]:
+		var nb2 := _big_button(pair[0], 96, 22)
+		nb2.name = "Nav" + str(nav.get_child_count())
+		nb2.pressed.connect(pair[1])
+		nav.add_child(nb2)
+	goal_label = Label.new()
+	goal_label.add_theme_font_size_override("font_size", 22)
+	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_label.custom_minimum_size = Vector2(screen.x - 70, 0)
+	v.add_child(goal_label)
+	var start := _big_button("START NIGHT  >", 110, 34, Color(0.24, 0.6, 0.25))
+	start.pressed.connect(start_night)
+	v.add_child(start)
+	# ---- dusk panel v2
+	dusk_panel.queue_free()
+	piece_buttons.clear()
+	dusk_panel = _panel(Vector2(16, screen.y - 392), Vector2(screen.x - 32, 0))
+	var dkv := VBoxContainer.new()
+	dkv.add_theme_constant_override("separation", 8)
+	dusk_panel.add_child(dkv)
+	planks_label = Label.new()
+	planks_label.add_theme_font_size_override("font_size", 26)
+	planks_label.add_theme_color_override("font_color", Color(1, 0.85, 0.4))
+	dkv.add_child(planks_label)
+	var pr := HBoxContainer.new()
+	pr.add_theme_constant_override("separation", 10)
+	dkv.add_child(pr)
+	for pc in ["barricade", "spikes", "scarecrow"]:
+		var pb := _big_button("", 100, 20)
+		pb.pressed.connect(func(): selected_piece = pc; _refresh_dusk())
+		pr.add_child(pb)
+		piece_buttons[pc] = pb
+	var info := Label.new()
+	info.name = "PieceInfo"
+	info.add_theme_font_size_override("font_size", 22)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.custom_minimum_size = Vector2(screen.x - 70, 64)
+	dkv.add_child(info)
+	var dr := HBoxContainer.new()
+	dr.add_theme_constant_override("separation", 10)
+	dkv.add_child(dr)
+	auto_btn = _big_button("AUTO-PLAN", 96, 22)
+	auto_btn.size_flags_horizontal = Control.SIZE_FILL
+	auto_btn.custom_minimum_size = Vector2(200, 96)
+	auto_btn.pressed.connect(func():
+		for sg in pieces:
+			planks += int(PIECE_COST[pieces[sg]])
+		pieces.clear()
+		scarecrow_hp.clear()
+		_auto_plan()
+		_refresh_dusk())
+	dr.add_child(auto_btn)
+	var go := _big_button("HOLD THE LINE  >", 96, 30, Color(0.24, 0.6, 0.25))
+	go.pressed.connect(begin_night)
+	dr.add_child(go)
+	dusk_panel.visible = false
+	forecast_label.add_theme_font_size_override("font_size", 26)
+	forecast_label.add_theme_constant_override("outline_size", 8)
+	forecast_label.position = Vector2(14, 48)
+	dawn_label.add_theme_font_size_override("font_size", 24)
+	over_label.add_theme_font_size_override("font_size", 24)
+	over_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	over_label.custom_minimum_size = Vector2(screen.x - 100, 0)
+	for pnl in [dawn_panel, over_panel]:
+		for b in pnl.find_children("*", "Button", true, false):
+			b.add_theme_font_size_override("font_size", 30)
+			b.custom_minimum_size = Vector2(0, 104)
+			b.add_theme_stylebox_override("normal", _btn_style(Color(0.24, 0.6, 0.25)))
+	county_label.add_theme_font_size_override("font_size", 21)
+	for rb2 in rival_buttons:
+		rb2.custom_minimum_size = Vector2(0, 100)
+		rb2.add_theme_font_size_override("font_size", 21)
+
+
+func show_banner(key: String, secs := 6.0, once := true) -> void:
+	if not ux2 or banner_panel == null or not sweep_values.is_empty():
+		return
+	if once and shown_tips.has(key):
+		return
+	shown_tips[key] = true
+	banner_label.text = TIPS_V2.get(key, key)
+	banner_panel.visible = true
+	banner_panel.size = Vector2(screen.x - 32, 0)
+	banner_t = secs
+
+
+func _refresh_ui_v2() -> void:
+	var names := {
+		"repair": ["Repair fences", "Fix all broken sections"],
+		"vaccine": ["Vaccine dart", "Cures 1 bitten animal (have %d)" % vaccines],
+		"fork": ["Pitchfork Lv %d" % (fork_level + 1), "+1 swing before you tire"],
+		"fence": ["Fences Lv %d" % (fence_level + 1), "Tougher, +1 plank a night"],
+		"chicken": ["Chicken", "Pays 3 coins each dawn"],
+		"pig": ["Pig", "Pays 6 coins each dawn"],
+		"cow": ["Cow", "Pays 10 coins each dawn"],
+		"planks": ["+3 planks", "Extra traps for tonight"],
+		"train_chicken": ["Hen bomber", "Herd hen > raid unit"],
+		"train_pig": ["Pig brawler", "Herd pig > raid unit"],
+		"train_cow": ["Cow tank", "Herd cow > raid unit"],
+	}
+	var unlock := {"vaccine": 1, "planks": 1, "repair": 1, "chicken": 1, "fork": 2, "fence": 2, "pig": 2, "cow": 2,
+		"train_chicken": 3, "train_pig": 3, "train_cow": 3}
+	for item in shop_buttons:
+		var btn: Button = shop_buttons[item]
+		var nm: Array = names[item]
+		btn.text = "%s   %d coins\n%s" % [nm[0], _cost(item), nm[1]]
+		btn.visible = night >= int(unlock[item])
+		btn.disabled = coins < _cost(item)
+		if item == "repair":
+			var dmg := false
+			for i in SEGMENTS:
+				if fence_hp[i] < fence_max:
+					dmg = true
+			btn.disabled = btn.disabled or not dmg
+			if not dmg:
+				btn.text = "Repair fences\nAll fences OK"
+		if item.begins_with("train_") and _healthy_of(item.trim_prefix("train_")) == null:
+			btn.disabled = true
+	var nav0: Button = shop_panel.find_child("Nav0", true, false)
+	if nav0:
+		nav0.visible = night >= 3
+		nav0.text = "RIVAL RAIDS\n%d raids left today" % (RAIDS_PER_DAY - raids_today)
+	if goal_label:
+		goal_label.text = "Tonight: zombies come for your %d animals. Every animal alive at sunrise pays coins." % healthy_count()
+		if pending_raid >= 0:
+			goal_label.text += "\nGAZETTE: a rival gang raids tonight!"
+
+
+func _forecast_summary() -> String:
+	var tot := {}
+	var sides := []
+	for g in plan:
+		for ty in g["units"]:
+			tot[ty] = int(tot.get(ty, 0)) + int(g["units"][ty])
+		var sn: String = SIDE_NAMES[g["side"]]
+		if not sides.has(sn):
+			sides.append(sn)
+	return "TONIGHT: %s\nfrom the %s" % [_units_text(tot), ", ".join(sides)]
+
+
+func _wave_label(units: Dictionary) -> String:
+	var out: Array = []
+	for ty in ["walker", "brute", "crow", "bloater"]:
+		var n: int = int(units.get(ty, 0))
+		if n > 0:
+			out.append(("%d %s%s" % [n, ty, "s" if n > 1 else ""]) if ty == "walker" else ("+%d %s" % [n, ty.to_upper()]))
+	return " ".join(out)
+
+
+func _refresh_dusk_v2() -> void:
+	forecast_label.text = _forecast_summary()
+	if pending_raid >= 0:
+		forecast_label.text += "\n+ RIVAL RAID at 0:16 (they steal coins)"
+	planks_label.text = "DUSK: %d plank%s left. Tap a glowing fence spot." % [planks, "" if planks == 1 else "s"]
+	for pc in piece_buttons:
+		var b: Button = piece_buttons[pc]
+		b.text = "%s\n%s" % [PIECE_V2[pc][0], PIECE_V2[pc][1]]
+		var sel: bool = pc == selected_piece
+		b.add_theme_stylebox_override("normal", _btn_style(Color(0.3, 0.27, 0.18) if sel else Color(0.2, 0.19, 0.17), Color(1, 0.85, 0.3) if sel else Color(0, 0, 0, 0)))
+		b.disabled = planks < int(PIECE_COST[pc]) and not sel
+	var info: Label = dusk_panel.find_child("PieceInfo", true, false)
+	if info:
+		# a zombie type the player has never met gets the whole info line
+		var newest := ""
+		for g in plan:
+			for ty in g["units"]:
+				if ty != "walker" and not seen_types.has(ty):
+					newest = ty
+		if newest != "":
+			info.text = TIPS_V2[newest]
+			info.add_theme_color_override("font_color", Color(1, 0.75, 1))
+		else:
+			info.remove_theme_color_override("font_color")
+			info.text = {
+				"barricade": "BARRICADE: that fence section is twice as tough tonight. Best vs BRUTES.",
+				"spikes": "SPIKES: hurt every zombie chewing that section. Best vs WALKERS.",
+				"scarecrow": "SCARECROW: crows peck it first, and hordes nearby walk to it. Put SPIKES next to it.",
+			}[selected_piece]
+
+
+func _dusk_camera(on: bool) -> void:
+	if not ux2:
+		return
+	if on:
+		cam.zoom = Vector2(1.15, 1.15)
+		cam.position = PEN_CENTER + Vector2(0, 96)
+	else:
+		cam.zoom = Vector2(1.5, 1.5)
+		cam.position = PEN_CENTER + Vector2(0, 40)
+
+
+func _wave_segments() -> Dictionary:
+	var segs := {}
+	for g in plan:
+		# a side's arrow sits on the boundary between two sections; hordes jitter onto both
+		for off in [-0.2, 0.2]:
+			segs[segment_at(PEN_CENTER + SIDE_DIRS[g["side"]].rotated(off) * PEN_RADIUS)] = true
+	return segs
+
+
+func _update_hint_v2() -> void:
+	var keys := ""
+	match phase:
+		Phase.DAY:
+			hint_label.text = ""
+			keys = "PC: Space = start night"
+		Phase.DUSK:
+			hint_label.text = ""
+			keys = "PC: click a fence spot to place, again to remove. Space = start"
+		Phase.NIGHT:
+			var bitten := _most_urgent_bitten(2000.0)
+			if farmer.carrying:
+				hint_label.text = "Carry it into the BARN glow to save it (barn %d/%d)." % [barn_used(), BARN_SLOTS]
+			elif bitten:
+				hint_label.text = "%s bitten! Walk into it, or lift your finger next to it for options." % String(bitten.kind).capitalize()
+			else:
+				hint_label.text = "Drag anywhere to move. Your pitchfork swings by itself."
+			keys = "PC: WASD move   E carry   Q cure   X send upstate   C chain"
+		Phase.DAWN:
+			hint_label.text = ""
+			keys = "PC: Space = next day"
+		_:
+			hint_label.text = ""
+	if keys_label:
+		keys_label.text = keys
+
+
+func _draw_wave_labels_v2(font: Font) -> void:
+	var by_side := {}
+	for i in range(plan_i if phase == Phase.NIGHT else 0, plan.size()):
+		var g: Dictionary = plan[i]
+		if not by_side.has(g["side"]):
+			by_side[g["side"]] = []
+		by_side[g["side"]].append(g)
+	var order := ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th"]
+	for side in by_side:
+		var d: Vector2 = SIDE_DIRS[side]
+		var tip := PEN_CENTER + d * (PEN_RADIUS + 14.0)
+		var tail := PEN_CENTER + d * (PEN_RADIUS + 60.0)
+		var col := Color(1, 0.5, 0.35, 0.95 if phase == Phase.DUSK else 0.5)
+		draw_line(tail, tip, col, 6.0)
+		draw_colored_polygon(PackedVector2Array([tip, tip - d * 18.0 + d.orthogonal() * 12.0, tip - d * 18.0 - d.orthogonal() * 12.0]), col)
+		if phase == Phase.NIGHT:
+			continue
+		var lines: Array = []
+		for g in by_side[side]:
+			lines.append("%s 0:%02d  %s" % [order[plan.find(g)], int(g["t"]), _wave_label(g["units"])])
+		var fs := 19 if side < 2 else 17
+		for k in lines.size():
+			var w := font.get_string_size(lines[k], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var lp: Vector2
+			match side:
+				0: lp = PEN_CENTER + Vector2(-w / 2, -PEN_RADIUS - 66 - 22 * (lines.size() - 1 - k))
+				1: lp = PEN_CENTER + Vector2(-w / 2, PEN_RADIUS + 78 + 22 * k)
+				2: lp = PEN_CENTER + Vector2(-PEN_RADIUS + 30, -74 - 24 * (lines.size() - 1 - k))
+				_: lp = PEN_CENTER + Vector2(PEN_RADIUS - 30 - w, -74 - 24 * (lines.size() - 1 - k))
+			var bg := Rect2(lp + Vector2(-5, -17), Vector2(w + 10, 23))
+			draw_rect(bg, Color(0, 0, 0, 0.55))
+			draw_string(font, lp, lines[k], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.88, 0.65))
+
+
+const FAN_LAYOUT_V2 := {"carry": Vector2(-150, -70), "cure": Vector2(-62, -185), "chain": Vector2(62, -185), "cull": Vector2(150, -70)}
+const FAN_R_V2 := 58.0
+
+func _draw_fan_v2(o: Node2D) -> void:
+	var font := ThemeDB.fallback_font
+	var cols := {"carry": Color(0.30, 0.75, 0.29), "cure": Color(0.25, 0.71, 1.0), "chain": Color(0.6, 0.45, 0.85), "cull": Color(0.9, 0.28, 0.23)}
+	var labels := {"carry": "SAVE\nto barn", "cure": "CURE\n%d dart%s" % [vaccines, "" if vaccines == 1 else "s"],
+		"chain": "CHAIN\n%d post%s" % [chain_posts, "" if chain_posts == 1 else "s"], "cull": "HOLD\nupstate"}
+	if vaccines <= 0:
+		labels["cure"] = "CURE\nno darts"
+	for k in FAN_LAYOUT_V2:
+		var c: Vector2 = fan_pos + FAN_LAYOUT_V2[k]
+		var col: Color = cols[k]
+		if not _fan_enabled(k):
+			col = Color(0.4, 0.4, 0.4)
+		o.draw_circle(c + Vector2(0, 6), FAN_R_V2, col.darkened(0.45))
+		o.draw_circle(c, FAN_R_V2, col)
+		o.draw_arc(c, FAN_R_V2, 0, TAU, 40, Color(1, 1, 1, 0.8), 3.0)
+		if k == "cull" and fan_hold_btn == "cull":
+			o.draw_arc(c, FAN_R_V2 + 7, -PI / 2, -PI / 2 + TAU * clampf(fan_hold_t / CULL_HOLD, 0, 1), 32, Color.WHITE, 7.0)
+		var lines: PackedStringArray = labels[k].split("\n")
+		for li in lines.size():
+			var fs := 24 if li == 0 else 18
+			var w := font.get_string_size(lines[li], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			var y := -2.0 if li == 0 else 22.0
+			o.draw_string_outline(font, c + Vector2(-w / 2, y), lines[li], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.8))
+			o.draw_string(font, c + Vector2(-w / 2, y), lines[li], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+	if fan_target and is_instance_valid(fan_target):
+		var tl := "%s turns in %ds" % [String(fan_target.kind).capitalize(), int(ceil(fan_target.infect_time))]
+		var w2 := font.get_string_size(tl, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x
+		o.draw_string_outline(font, fan_pos + Vector2(-w2 / 2, -262), tl, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, 7, Color.BLACK)
+		o.draw_string(font, fan_pos + Vector2(-w2 / 2, -262), tl, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color(1, 0.8, 0.3))
+		# line from the fan to the animal it acts on
+		var tp: Vector2 = get_canvas_transform() * fan_target.position
+		o.draw_line(fan_pos + Vector2(0, -250), tp, Color(1, 0.8, 0.3, 0.6), 3.0)
+
+
+func _dawn_text_v2(rec: Dictionary, produce: int, bonus: int, total: int, lost_infected: int, burned: int, extra: String) -> String:
+	var kept: int = animals.size()
+	var start: int = int(rec["herd_at_dusk"])
+	var stars := 3 if kept >= start else (2 if kept * 3 >= start * 2 else (1 if kept > 0 else 0))
+	var t := "Night %d over.  Herd kept %d / %d   %s\n\n" % [night, kept, start, "*".repeat(stars) + "-".repeat(3 - stars)]
+	t += "+%d coins from your animals\n+%d coins for zombies bonked\n= +%d coins\n" % [produce, bonus, total]
+	var saved: int = stats["saved"] + stats["cured"]
+	if saved > 0:
+		t += "\nYou saved %d bitten animal%s. Nice.\n" % [saved, "" if saved == 1 else "s"]
+	var lost: int = start - kept
+	if lost > 0:
+		t += "\nLost %d: %d turned into zombies%s.\n" % [lost, stats["turned"], (", %d still bitten at sunrise" % lost_infected) if lost_infected > 0 else ""]
+	# one tip, aimed at the biggest mistake of the night
+	var tip := ""
+	if stats["turned"] > 0 and stats["saved"] + stats["cured"] == 0:
+		tip = "TIP: a bitten animal turns in 8 s. Walk into it and carry it into the BARN."
+	elif stats["turned"] > 0 and vaccines > 0:
+		tip = "TIP: you still had %d dart%s. Lift your finger next to a bitten animal and tap CURE." % [vaccines, "" if vaccines == 1 else "s"]
+	elif pieces.is_empty() and rec.get("planned", true) == false:
+		tip = "TIP: place planks at dusk on the glowing fence spots."
+	if tip != "":
+		t += "\n" + tip + "\n"
+	t += extra.replace("\nArmy feed:", "\nArmy ate:")
+	return t

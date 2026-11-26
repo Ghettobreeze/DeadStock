@@ -24,13 +24,15 @@ Portrait (720x1280). Mouse clicks act as touches, so the phone controls work on 
      Kill them **outside** the fence.
    From night 4, the last wave hits two sides at once. Your pitchfork costs **stamina** per swing, so you
    can't hold every side: pick your fights. A bitten animal turns after 8 seconds unless you
-   **Save** it (carry into the barn glow, 4 slots), **Cure** it (vaccine dart), **Send it upstate** (hold), or
+   **Save** it (carry into the barn glow, 3 slots; the barn cures it and sends it back out after 15 seconds), **Cure** it (vaccine dart), **Send it upstate** (hold), or
    **Chain** it (it becomes a Dead Stock soldier, 2 posts a night). At most 35% of the herd can turn in one night.
 4. **Dawn:** surviving animals pay out, the army eats (feed costs coins), and the **Dawn Gazette** may warn you
    that a rival gang raids tomorrow night.
 
-Balance check (sweep bot, 8 nights x 3 runs): a bot that plans at dusk and triages bites keeps 96% of its herd;
-a bot that skips planning and just chases zombies keeps 48% and usually loses the farm.
+Balance check (human-like bot: ~2 s to notice a bite, one thing at a time, rebuys animals; 4 seeds x 10 nights):
+a bot that reads the forecast and plans at dusk keeps 88% of its herd per night and never goes broke;
+the same bot with no dusk plan keeps 79% and goes broke (herd 3 or less, can't afford to restock) in 4 of 4 runs.
+Zombies breach the fence 2.5 times a night against a plan vs 16.8 without one. A full wipe is impossible by design.
 
 ## Simulated PvP (release-1 plan)
 No servers and no other players yet. PvP is simulated:
@@ -63,7 +65,7 @@ Space start night / next day.
 - `godot --path . -- --autotest=<folder>`: bot plays 3 nights, a rival raid, Fence Fixer and a rival raid
   night, and saves screenshots.
 - `godot --headless --path . --fixed-fps 30 -- --sweep=8 --nights=8 --runs=3 [--lazy]`: balance bot
-  (`--lazy` = skip dusk planning and just chase zombies).
+  (`--lazy` = skip dusk planning and just chase zombies; `--planner=none|auto|random`, `--set=NAME=VALUE` overrides any tuning number).
 - Fence Fixer alone: run `ff.tscn` (`--verify` proves the levels solvable headless).
 
 The prototype prints `[telemetry]` lines to the console only. It sends nothing over the network.
