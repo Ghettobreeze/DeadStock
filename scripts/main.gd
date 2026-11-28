@@ -321,7 +321,8 @@ func _ready() -> void:
 			bot_planner = "none"
 		if sweep_lazy:
 			bot_triage = "lazy"
-	_new_game()
+	if not _load_game():
+		_new_game()
 
 
 func _setup_view() -> void:
@@ -337,6 +338,64 @@ func _setup_view() -> void:
 	var half := screen / cam.zoom / 2.0
 	farmer_min = cam.position - half + Vector2(20, 60)
 	farmer_max = cam.position + half - Vector2(20, 20)
+
+
+# ---------------------------------------------------------------- save / resume
+# Saved every morning, so a reload (e.g. iOS Safari dropping the graphics when you
+# switch apps) puts you back at the start of the same day instead of night 1.
+
+const SAVE_PATH := "user://run.save"
+const SAVE_KEYS := ["night", "coins", "vaccines", "parts", "dead_stock", "army", "ribbons", "rival_best",
+	"rival_week", "raid_counts", "pending_raid", "last_raid_night", "last_raided_rival", "ff_best",
+	"fork_level", "fence_level", "fence_max", "seen_types", "shown_tips", "bonus_planks"]
+
+
+func _save_enabled() -> bool:
+	return sweep_values.is_empty() and autotest_dir == ""
+
+
+func _save_game() -> void:
+	if not _save_enabled():
+		return
+	var d := {"v": 1}
+	for k in SAVE_KEYS:
+		d[k] = get(k)
+	d["fence_hp"] = Array(fence_hp)
+	var herd := []
+	for a in animals:
+		if is_instance_valid(a) and a.state != a.State.ZOMBIE:
+			herd.append(a.kind)
+	d["herd"] = herd
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(var_to_str(d))
+		f.close()
+
+
+func _load_game() -> bool:
+	if not _save_enabled() or not FileAccess.file_exists(SAVE_PATH):
+		return false
+	var d = str_to_var(FileAccess.get_file_as_string(SAVE_PATH))
+	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != 1 or (d.get("herd", []) as Array).is_empty():
+		return false
+	_new_game()   # clean slate, then overwrite with the saved run
+	for a in animals:
+		a.queue_free()
+	animals.clear()
+	for k in SAVE_KEYS:
+		if d.has(k):
+			set(k, d[k])
+	fence_hp.clear()
+	for v in d.get("fence_hp", []):
+		fence_hp.append(float(v))
+	while fence_hp.size() < SEGMENTS:
+		fence_hp.append(fence_max)
+	_reset_seg_max()
+	for kind in d["herd"]:
+		_add_animal(kind)
+	_enter_day()
+	popup(PEN_CENTER, "Welcome back - day %d" % night, Color(1, 0.95, 0.6))
+	return true
 
 
 func _new_game() -> void:
@@ -603,6 +662,7 @@ func _fresh_panel() -> bool:
 func _enter_day() -> void:
 	phase = Phase.DAY
 	print("[phase] day ", night)
+	_save_game()
 	panel_opened_ms = Time.get_ticks_msec()
 	raids_today = 0
 	if county_panel:
@@ -789,6 +849,7 @@ func _reset_touch() -> void:
 
 func _game_over() -> void:
 	phase = Phase.GAME_OVER
+	DirAccess.remove_absolute(SAVE_PATH)
 	_reset_touch()
 	over_label.text = "THE FARM IS LOST\n\nYou made it to night %d." % night
 	if ux2:
